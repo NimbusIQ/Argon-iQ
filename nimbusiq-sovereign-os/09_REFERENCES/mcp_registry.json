@@ -1,0 +1,37 @@
+{
+  "mcp_registry_version": "1.2.0",
+  "servers": [
+    {
+      "name": "gemini-api-docs",
+      "type": "official_mcp",
+      "endpoint": "https://gemini-api-docs-mcp.dev",
+      "install_command": "npx add-mcp \"https://gemini-api-docs-mcp.dev\"",
+      "permissions": "read_only"
+    },
+    {
+      "name": "file_check_catalog",
+      "type": "internal_mcp",
+      "endpoint": "/api/catalog",
+      "permissions": "read_verify",
+      "description": "Real-time workspace file inventory, SHA-256 checksums, secret scan & Firebase security audit"
+    },
+    {
+      "name": "satcalc_engine",
+      "type": "mcp",
+      "permissions": "read_execute",
+      "description": "Deterministic roof math re-derivation & IRC building code lookup"
+    },
+    {
+      "name": "fhir_medical",
+      "type": "mcp",
+      "permissions": "read_write_hipaa",
+      "description": "MedGemma / EHR clinical intake & FHIR record synchronization with HITL gate"
+    },
+    {
+      "name": "firebase_control_plane",
+      "type": "mcp",
+      "permissions": "auth_firestore_rules",
+      "description": "Bound project google-mpf-u5ao4iqsmytq Auth, Firestore DB, and hardened ABAC rules"
+    }
+  ]
+}

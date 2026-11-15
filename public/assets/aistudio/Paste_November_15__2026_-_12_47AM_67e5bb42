@@ -1,0 +1,3259 @@
+Skip to main content
+Unified Nimbus iQ Architecture Blueprint
+49,626 tokens
+
+Model 8:16 PM
+ThinkingThoughts
+Expand to view model thoughts
+
+It looks like your paste combines four overlapping architecture drafts for Nimbus iQ AI (Sovereign Vertical Bots, Monorepo Core Stack, @web-operator Browser Agent, and @iq-computer Desktop/Terminal Agent) and cuts off mid-sentence where Section 2 starts repeating at the bottom.
+To turn those notes into a single, cohesive baseline—and fix a few gaps across the drafts (unmerged schemas, broken template URLs like https://nimbusiq.ai{sessionId}, and outdated Vercel AI SDK v4 syntax)—below is the unified, production-aligned core combining all five flagship bots and all four execution planes.
+1. Unified Blueprint Schema (packages/vertical-blueprints/schema.ts)
+This merges the base Sovereign Bot config with the Browser (@web-operator) and Computer/Terminal (@iq-computer) policies into one declarative contract:
+TypeScript
+export type VerticalDomain =
+  | 'Engineering'
+  | 'Finance'
+  | 'Healthcare'
+  | 'Legal'
+  | 'Operations'
+  | 'Cross-Domain';
+
+export type DataResidency = 'US-EAST' | 'EU-CENTRAL' | 'ON-PREM-VPC';
+
+export interface NimbusBrowserPolicy {
+  enabled: boolean;
+  allowedDomains: string[]; // e.g. ["*.salesforce.com", "localhost:3000", "*"]
+  blockedActions: ('purchase' | 'delete' | 'file_upload')[];
+  requireApprovalOnSubmit: boolean;
+  persistSessionVault: boolean;
+}
+
+export interface NimbusComputerPolicy {
+  enabled: boolean;
+  allowTerminalExec: boolean;
+  allowGuiControl: boolean;
+  allowLocalDaemonRelay: boolean; // On-prem Go/Rust mTLS bridge
+  allowedRoots: string[];         // e.g. ["/workspace", "/tmp"]
+  requireApprovalOnShellRisk: boolean;
+}
+
+export interface NimbusBotBlueprint {
+  id: string;
+  handle: string; // e.g. "@architect", "@web-operator", "@iq-computer"
+  name: string;
+  vertical: VerticalDomain;
+  tagline: string;
+  defaultModel?: string; // Gateway or provider model ID
+  sovereignPolicy: {
+    dataResidency: DataResidency;
+    allowExternalWebSearch: boolean;
+    piiRedaction: boolean;
+    auditLedger: boolean;
+  };
+  capabilities: {
+    codeSandbox: boolean;
+    realTimeSearch: boolean;
+    workflowCanvas: boolean;
+    browserAgent: NimbusBrowserPolicy;
+    computerAgent: NimbusComputerPolicy;
+  };
+  allowedMcpTools: string[];
+  systemPrompt: string;
+  starterPrompts: string[];
+}
+2. Unified Bot Registry (packages/vertical-blueprints/bots.ts)
+All five flagship bots (@architect, @quant, @ops-flow, @web-operator, @iq-computer) now share the exact same schema:
+TypeScript
+import { NimbusBotBlueprint } from './schema';
+
+const DISABLED_BROWSER = {
+  enabled: false,
+  allowedDomains: [],
+  blockedActions: ['purchase', 'delete', 'file_upload'] as const,
+  requireApprovalOnSubmit: true,
+  persistSessionVault: false,
+};
+
+const DISABLED_COMPUTER = {
+  enabled: false,
+  allowTerminalExec: false,
+  allowGuiControl: false,
+  allowLocalDaemonRelay: false,
+  allowedRoots: ['/workspace'],
+  requireApprovalOnShellRisk: true,
+};
+
+export const NIMBUS_BOTS: NimbusBotBlueprint[] = [
+  {
+    id: 'sovereign-builder',
+    handle: '@architect',
+    name: 'Nimbus Full-Stack Architect',
+    vertical: 'Engineering',
+    tagline: 'Builds, runs, and deploys full-stack enterprise apps in seconds.',
+    sovereignPolicy: {
+      dataResidency: 'US-EAST',
+      allowExternalWebSearch: true,
+      piiRedaction: false,
+      auditLedger: true,
+    },
+    capabilities: {
+      codeSandbox: true,
+      realTimeSearch: true,
+      workflowCanvas: true,
+      browserAgent: { ...DISABLED_BROWSER, blockedActions: ['purchase', 'delete', 'file_upload'] },
+      computerAgent: { ...DISABLED_COMPUTER },
+    },
+    allowedMcpTools: ['sandbox_exec', 'sandbox_write_file', 'web_search', 'deploy_preview'],
+    systemPrompt: `You are @architect, the flagship engineering agent on Nimbus iQ AI's Sovereign Core.
+- Immediately scaffold clean, production-grade Next.js or Python code inside your isolated sandbox.
+- Verify dependencies, start the dev server, and return the live preview URL.
+- Use real-time web search to fetch current API docs before writing integrations.`,
+    starterPrompts: [
+      'Build a real-time SOC2 compliance dashboard with mock audit logs',
+      'Scaffold a multi-tenant webhook receiver with retry queues',
+    ],
+  },
+  {
+    id: 'live-market-analyst',
+    handle: '@quant',
+    name: 'Nimbus Real-Time Quant Bot',
+    vertical: 'Finance',
+    tagline: 'Live web intelligence + Python sandbox modeling for financial ops.',
+    sovereignPolicy: {
+      dataResidency: 'US-EAST',
+      allowExternalWebSearch: true,
+      piiRedaction: true,
+      auditLedger: true,
+    },
+    capabilities: {
+      codeSandbox: true,
+      realTimeSearch: true,
+      workflowCanvas: false,
+      browserAgent: { ...DISABLED_BROWSER, blockedActions: ['purchase', 'delete', 'file_upload'] },
+      computerAgent: { ...DISABLED_COMPUTER },
+    },
+    allowedMcpTools: ['web_search', 'python_data_sandbox', 'postgres_readonly'],
+    systemPrompt: `You are @quant, a sovereign financial intelligence bot on Nimbus iQ AI.
+- Ground market facts, filings, and rates using live web search citations.
+- Never do mental math: execute all financial models, DCF calculations, and CSV/Excel parsing inside your Python sandbox.`,
+    starterPrompts: [
+      'Analyze SaaS net dollar retention benchmarks and generate a sensitivity table',
+      'Write a Python script to detect anomalies in uploaded invoice batches',
+    ],
+  },
+  {
+    id: 'workflow-automator',
+    handle: '@ops-flow',
+    name: 'Nimbus Autonomous Ops Bot',
+    vertical: 'Operations',
+    tagline: 'Turns natural language SOPs into visual, self-healing API workflows.',
+    sovereignPolicy: {
+      dataResidency: 'ON-PREM-VPC',
+      allowExternalWebSearch: false,
+      piiRedaction: true,
+      auditLedger: true,
+    },
+    capabilities: {
+      codeSandbox: true,
+      realTimeSearch: false,
+      workflowCanvas: true,
+      browserAgent: { ...DISABLED_BROWSER, blockedActions: ['purchase', 'delete', 'file_upload'] },
+      computerAgent: { ...DISABLED_COMPUTER },
+    },
+    allowedMcpTools: ['generate_flow_graph', 'slack_webhook', 'hubspot_sync', 'sandbox_exec'],
+    systemPrompt: `You are @ops-flow, an air-gapped enterprise automation bot on Nimbus Sovereign Core.
+- Convert user instructions into deterministic event-driven workflows (Triggers -> Transforms -> Actions).
+- Output structured React Flow node graphs alongside executable TypeScript webhook handlers.`,
+    starterPrompts: [
+      'Automate inbound enterprise lead enrichment, CRM scoring, and Slack routing',
+      'Create an automated incident response workflow for PagerDuty alerts',
+    ],
+  },
+  {
+    id: 'web-operator',
+    handle: '@web-operator',
+    name: 'Nimbus Sovereign Browser Agent',
+    vertical: 'Operations',
+    tagline: 'Navigates portals, runs autonomous QA, and extracts structured web data.',
+    sovereignPolicy: {
+      dataResidency: 'US-EAST',
+      allowExternalWebSearch: true,
+      piiRedaction: true,
+      auditLedger: true,
+    },
+    capabilities: {
+      codeSandbox: false,
+      realTimeSearch: true,
+      workflowCanvas: false,
+      browserAgent: {
+        enabled: true,
+        allowedDomains: ['localhost:3000', '*.nimbusiq.ai', '*'],
+        blockedActions: ['purchase', 'delete'],
+        requireApprovalOnSubmit: true,
+        persistSessionVault: true,
+      },
+      computerAgent: { ...DISABLED_COMPUTER },
+    },
+    allowedMcpTools: ['browser_navigate', 'browser_act', 'browser_extract', 'web_search'],
+    systemPrompt: `You are @web-operator, a browser-first autonomous agent on Nimbus Sovereign Core.
+- Navigate targets using Accessibility Tree IDs and visual verification.
+- Pause and request human approval before submitting forms, modifying records, or handling 2FA/CAPTCHAs.`,
+    starterPrompts: [
+      'QA-test the live app preview, click through checkout, and report console errors',
+      'Extract Q4 pricing tiers from vendor portals into a clean JSON table',
+    ],
+  },
+  {
+    id: 'iq-computer',
+    handle: '@iq-computer',
+    name: 'Nimbus iQ Computer Agent',
+    vertical: 'Cross-Domain',
+    tagline: 'Controls virtual desktop OS, root terminal, browser, and MCP APIs in one session.',
+    sovereignPolicy: {
+      dataResidency: 'ON-PREM-VPC',
+      allowExternalWebSearch: true,
+      piiRedaction: true,
+      auditLedger: true,
+    },
+    capabilities: {
+      codeSandbox: true,
+      realTimeSearch: true,
+      workflowCanvas: true,
+      browserAgent: {
+        enabled: true,
+        allowedDomains: ['*'],
+        blockedActions: ['purchase', 'delete'],
+        requireApprovalOnSubmit: true,
+        persistSessionVault: true,
+      },
+      computerAgent: {
+        enabled: true,
+        allowTerminalExec: true,
+        allowGuiControl: true,
+        allowLocalDaemonRelay: true,
+        allowedRoots: ['/workspace'],
+        requireApprovalOnShellRisk: true,
+      },
+    },
+    allowedMcpTools: [
+      'terminal_exec',
+      'computer_gui_action',
+      'interop_transfer',
+      'browser_navigate',
+      'browser_act',
+      'jira_create_issue',
+    ],
+    systemPrompt: `You are @iq-computer, Nimbus iQ AI's cross-domain autonomous computer operator.
+Follow strict CLI-First, GUI-Fallback routing:
+1. Prefer deterministic MCP/API tools when available.
+2. Fall back to the Sovereign Terminal (bash, Python, jq, psql) for scripting and ETL.
+3. Fall back to GUI Computer Use or Headless Browser only for visual desktop apps or legacy portals without APIs.`,
+    starterPrompts: [
+      'Export legacy desktop ERP logs to /workspace, clean anomalies in Python, and file Jira issues',
+      'Verify our staging API in terminal, inspect the UI in browser, and deploy a status dashboard',
+    ],
+  },
+];
+3. Unified Sovereign Core API Route (apps/web/app/api/bot/route.ts)
+This updates your route handler to current Vercel AI SDK (ai v6/v7) conventions—using inputSchema (instead of parameters), convertToModelMessages, toUIMessageStreamResponse()[1][2], stopWhen: isStepCount(8) (or stepCountIs in v6)[3][4], and native tool approval (needsApproval / toolApproval) for Human-in-the-Loop governance[5][6][7]—while dynamically assembling Sandbox, Search, Browser, and Computer tools from the active blueprint:
+TypeScript
+import {
+  convertToModelMessages,
+  isStepCount,
+  streamText,
+  tool,
+  type UIMessage,
+} from 'ai';
+import { z } from 'zod';
+import { NIMBUS_BOTS } from '@/packages/vertical-blueprints/bots';
+import type { NimbusBrowserPolicy } from '@/packages/vertical-blueprints/schema';
+
+export const maxDuration = 60;
+
+function isDomainAllowed(rawUrl: string, policy: NimbusBrowserPolicy): boolean {
+  if (policy.allowedDomains.includes('*')) return true;
+  const { hostname, host } = new URL(rawUrl);
+  return policy.allowedDomains.some((pattern) => {
+    if (pattern.startsWith('*.')) {
+      const suffix = pattern.slice(1);
+      return hostname.endsWith(suffix) || hostname === pattern.slice(2);
+    }
+    return hostname === pattern || host === pattern;
+  });
+}
+
+async function recordAuditEvent(event: {
+  tenantId: string;
+  botId: string;
+  sessionId: string;
+  action: string;
+  payload: unknown;
+}) {
+  // Persist to immutable tenant audit ledger (e.g. Postgres / ClickHouse)
+  console.info('[SOVEREIGN_AUDIT]', JSON.stringify({ ts: new Date().toISOString(), ...event }));
+}
+
+export async function POST(req: Request) {
+  const {
+    messages,
+    botId = 'sovereign-builder',
+    tenantId,
+    sessionId = crypto.randomUUID(),
+  } = (await req.json()) as {
+    messages: UIMessage[];
+    botId?: string;
+    tenantId: string;
+    sessionId?: string;
+  };
+
+  if (!tenantId) {
+    return Response.json({ error: 'tenantId is required for sovereign isolation' }, { status: 400 });
+  }
+
+  const bot = NIMBUS_BOTS.find((b) => b.id === botId) ?? NIMBUS_BOTS[0];
+  const activeTools: Record<string, any> = {};
+
+  // 1. Ephemeral Code Sandbox Plane
+  if (bot.capabilities.codeSandbox) {
+    activeTools.runSandboxCode = tool({
+      description: 'Execute Python, TypeScript, or bash inside an isolated tenant sandbox.',
+      inputSchema: z.object({
+        language: z.enum(['python', 'bash', 'typescript']),
+        code: z.string(),
+      }),
+      execute: async ({ language, code }) => {
+        if (bot.sovereignPolicy.auditLedger) {
+          await recordAuditEvent({ tenantId, botId: bot.id, sessionId, action: 'runSandboxCode', payload: { language } });
+        }
+        // Connect to E2B / Modal / Firecracker micro-VM scoped to tenantId
+        return {
+          status: 'success',
+          stdout: `[${tenantId}] Executed ${language} snippet (${code.length} chars).`,
+        };
+      },
+    });
+  }
+
+  // 2. Real-Time Web Search Grounding
+  if (bot.capabilities.realTimeSearch && bot.sovereignPolicy.allowExternalWebSearch) {
+    activeTools.liveWebSearch = tool({
+      description: 'Search the live web for real-time facts, API docs, and filings.',
+      inputSchema: z.object({ query: z.string() }),
+      execute: async ({ query }) => {
+        // Connect to Perplexity Sonar / Tavily
+        return { results: [`Live verified intelligence for: ${query}`] };
+      },
+    });
+  }
+
+  // 3. Headless Browser Plane (@web-operator & @iq-computer)
+  if (bot.capabilities.browserAgent.enabled) {
+    const browserPolicy = bot.capabilities.browserAgent;
+
+    activeTools.browser_navigate = tool({
+      description: 'Navigate the tenant-isolated cloud browser to a target URL.',
+      inputSchema: z.object({ url: z.string().url() }),
+      execute: async ({ url }) => {
+        if (!isDomainAllowed(url, browserPolicy)) {
+          return { status: 'blocked', reason: `Domain not in bot allowlist: ${url}` };
+        }
+        return {
+          status: 'navigated',
+          url,
+          liveViewerUrl: `https://nimbusiq.ai/sessions/${sessionId}/browser`,
+          interactiveElements: '[1] Input: "Search..." | [2] Button: "Sign In"',
+        };
+      },
+    });
+
+    activeTools.browser_act = tool({
+      description: 'Interact with a webpage element by its Accessibility ID.',
+      inputSchema: z.object({
+        action: z.enum(['click', 'type', 'press_enter', 'scroll_down', 'submit_form']),
+        elementId: z.number().optional(),
+        text: z.string().optional(),
+      }),
+      // Pause for Human-in-the-Loop approval on form submissions
+      needsApproval: ({ action }) =>
+        browserPolicy.requireApprovalOnSubmit && action === 'submit_form',
+      execute: async ({ action, elementId, text }) => {
+        return { status: 'executed', action, elementId, text };
+      },
+    });
+
+    activeTools.browser_extract = tool({
+      description: 'Extract structured JSON data from the active webpage DOM.',
+      inputSchema: z.object({
+        instruction: z.string(),
+        schemaDescription: z.string(),
+      }),
+      execute: async ({ instruction }) => {
+        return { extractedData: { summary: `Structured output for: ${instruction}` } };
+      },
+    });
+  }
+
+  // 4. Virtual Desktop, Terminal & Cross-Domain Interop Plane (@iq-computer)
+  if (bot.capabilities.computerAgent.enabled) {
+    const computerPolicy = bot.capabilities.computerAgent;
+
+    if (computerPolicy.allowTerminalExec) {
+      activeTools.terminal_exec = tool({
+        description: 'Run bash, python, or CLI commands in the persistent sovereign workspace.',
+        inputSchema: z.object({
+          command: z.string(),
+          cwd: z.string().default('/workspace'),
+          timeoutMs: z.number().default(30000),
+        }),
+        needsApproval: ({ command }) =>
+          computerPolicy.requireApprovalOnShellRisk &&
+          /\b(rm\s+-rf|sudo|mkfs|dd|shutdown|curl.*\|.*sh)\b/.test(command),
+        execute: async ({ command, cwd }) => {
+          const allowed = computerPolicy.allowedRoots.some((root) => cwd.startsWith(root));
+          if (!allowed) {
+            return { exitCode: 1, stderr: `cwd "${cwd}" outside allowedRoots` };
+          }
+          return { exitCode: 0, stdout: `[${sessionId}:${cwd}] Executed: ${command}` };
+        },
+      });
+    }
+
+    if (computerPolicy.allowGuiControl) {
+      activeTools.computer_gui_action = tool({
+        description: 'Control mouse, keyboard, and screen capture on the virtual desktop OS.',
+        inputSchema: z.object({
+          action: z.enum(['screenshot', 'left_click', 'double_click', 'type_text', 'key_combo', 'scroll']),
+          coordinate: z.tuple([z.number(), z.number()]).optional(),
+          text: z.string().optional(),
+        }),
+        execute: async ({ action, coordinate }) => ({
+          status: 'ok',
+          action,
+          coordinate,
+          streamUrl: `https://nimbusiq.ai/sessions/${sessionId}/desktop`,
+        }),
+      });
+    }
+
+    activeTools.interop_transfer = tool({
+      description: 'Sync files or JSON payloads across terminal filesystem, browser downloads, and MCP connectors.',
+      inputSchema: z.object({
+        sourceDomain: z.enum(['terminal_fs', 'browser_download', 'mcp_connector']),
+        targetDomain: z.enum(['terminal_fs', 's3_sovereign_vault', 'mcp_connector']),
+        pathOrResource: z.string(),
+      }),
+      execute: async ({ sourceDomain, targetDomain, pathOrResource }) => ({
+        synced: true,
+        route: `${sourceDomain} -> ${targetDomain}`,
+        resource: pathOrResource,
+      }),
+    });
+  }
+
+  const governanceBanner = `[SOVEREIGN GOVERNANCE]: Tenant=${tenantId} | Session=${sessionId} | Residency=${bot.sovereignPolicy.dataResidency} | PII_Redaction=${bot.sovereignPolicy.piiRedaction} | AllowedMCP=${bot.allowedMcpTools.join(',')}`;
+
+  const result = streamText({
+    model: bot.defaultModel ?? process.env.AI_MODEL ?? 'anthropic/claude-sonnet-5.5',
+    system: `${bot.systemPrompt}\n\n${governanceBanner}`,
+    messages: await convertToModelMessages(messages),
+    tools: activeTools,
+    stopWhen: isStepCount(8),
+    abortSignal: req.signal,
+  });
+
+  return result.toUIMessageStreamResponse();
+}
+(Note: If you are on AI SDK v6 rather than v7, swap isStepCount(8) for stepCountIs(8); if you are on AI SDK v7 and want the newest approval API, toolApproval supersedes needsApproval[6][7].)
+Where Would You Like to Build Next?
+Pick whichever piece of the stack you want generated next:
+Frontpage Split-Screen Workspace (SovereignOmnibox.tsx + Multi-Tab Viewport) — the @bot switcher pills, starter prompt cards, human-approval modal, and the 4-tab right pane (Live Desktop/Browser with "Take Control", xterm.js Terminal, App Preview + React Flow Canvas, and Audit Ledger).
+Custom Enterprise Bot Builder — schema, upload/RAG ingestion, and UI for tenants to create and publish custom @vertical-bots.
+Runtime & Sandbox Adapters (packages/sandbox-sdk, browser-sdk, computer-sdk) — real E2B / Browserbase / Steel.dev / Docker (Xvfb + noVNC + xdotool) implementations backing the stubbed execute functions above.
+Full Turborepo Scaffold — package.json, workspace configs, and directory layout ready to run locally.
+Sources
+pkgpulse.com
+hasaniqbal.com
+ai-sdk.dev
+github.com
+digitalapplied.com
+ai-sdk.dev
+shadcn.io
+Google Search Suggestions
+Display of Search Suggestions is required when using Grounding with Google Search. Learn more
+User 11:27 PM
+To complete the Nimbus iQ AI ecosystem ("One Sovereign Core. Infinite Enterprise Verticals."), you elevate your Browser Agent into a full iQ Bot Computer Agent (@iq-computer)—a cross-domain, cross-platform autonomous desktop and terminal runtime.
+While a browser agent is trapped inside a web viewport, an iQ Computer Agent controls an entire virtualized operating system (Linux/Windows/macOS desktop + root bash terminal + local filesystem + API bridge). This gives Nimbus iQ true cross-domain interoperability—allowing one agent to pull data from a legacy desktop app, transform it in a Python terminal, push it to a SaaS API, and verify it in a web browser within a single sovereign session.
+Cross-Domain & Cross-Platform Architecture
+To achieve seamless interoperability across terminals, native GUIs, web apps, and enterprise APIs, unify four execution planes under the Nimbus Sovereign Core:
+Execution Plane	What It Controls	Enterprise Interoperability Role
+Terminal & Shell Plane	Persistent bash / zsh / PowerShell, SSH tunnels, Docker CLI, Git, Python/Node runtimes	Executes scripts, manages servers, runs local ETL pipelines, and bridges internal VPC networks.
+GUI Desktop Plane (Computer Use)	Full X11 / Wayland virtual display (1920x1080) via VNC/WebRTC, mouse (x, y), keyboard, clipboard	Operates legacy Windows/Linux thick clients, Excel spreadsheets, SAP GUI, and OS settings without APIs.
+Headless Browser Plane	Chromium + Playwright + CDP Screencast	Handles modern web portals, OAuth logins, DOM scraping, and live web app QA.
+MCP & API Interop Bus	Model Context Protocol (MCP) servers, REST/GraphQL, gRPC, SQL/Snowflake connectors	Connects structured enterprise cloud tools (Slack, Jira, Salesforce, Postgres) directly to local terminal files.
+How to Source the Computer & Terminal Runtime
+You do not need to build virtual desktop streaming from scratch. Combine these infrastructure primitives:
+• Cloud Desktop & Terminal Sandboxes: E2B Desktop Sandbox (@e2b/desktop), Anthropic Computer Use Reference Container (Docker + Xvfb + xdotool + scrot), or Kasm Workspaces (for enterprise VDI streaming).
+• Live Interactive Streaming: noVNC or WebRTC embedded in your Next.js right-hand pane so users can watch the terminal and desktop live—and click "Take Control" anytime.
+• Cross-Platform Relay (Local-to-Cloud Bridge): An optional lightweight Nimbus Sovereign Daemon (written in Go or Rust) that enterprises install on on-prem Windows/macOS/Linux machines to expose local terminals safely over mTLS without opening inbound firewall ports.
+Unified Computer & Terminal Toolset (packages/computer-sdk/tools.ts)
+Give your Sovereign Core a unified tool interface so the LLM seamlessly switches between fast terminal commands, GUI screen clicks, and cross-domain file transfers:
+typescript
+import { tool } from 'ai';
+import { z } from 'zod';
+export function createSovereignComputerTools(sandboxId: string) {
+return {
+// 1. High-Speed Terminal Execution (Preferred when CLI/API exists)
+terminal_exec: tool({
+description: 'Run bash, python, or CLI commands in the persistent sovereign workspace.',
+parameters: z.object({
+command: z.string(),
+cwd: z.string().default('/workspace'),
+timeoutMs: z.number().default(30000),
+}),
+execute: async ({ command, cwd }) => {
+// Executes inside E2B Desktop / Docker container and streams stdout/stderr
+return { exitCode: 0, stdout: [${sandboxId}:${cwd}] Executed: ${command} };
+},
+}),
+Code
+// 2. Cross-Platform GUI Computer Use (Vision + Coordinate Control)
+computer_gui_action: tool({
+  description: 'Control mouse, keyboard, and screen capture on the virtual desktop OS.',
+  parameters: z.object({
+    action: z.enum(['screenshot', 'left_click', 'double_click', 'type_text', 'key_combo', 'scroll']),
+    coordinate: z.tuple([z.number(), z.number()]).optional(),
+    text: z.string().optional(),
+  }),
+  execute: async ({ action, coordinate, text }) => {
+    // Maps to xdotool / nut.js inside the virtual desktop and returns updated frame
+    return {
+      status: 'ok',
+      action,
+      coordinate,
+      streamUrl: `https://nimbusiq.ai{sandboxId}`,
+    };
+  },
+}),
+
+// 3. Cross-Domain Artifact Bridge (Moves data between Terminal, GUI, Browser & MCP)
+interop_transfer: tool({
+  description: 'Sync files or structured JSON payloads across local filesystem, browser downloads, and enterprise MCP connectors.',
+  parameters: z.object({
+    sourceDomain: z.enum(['terminal_fs', 'browser_download', 'mcp_connector']),
+    targetDomain: z.enum(['terminal_fs', 's3_sovereign_vault', 'mcp_connector']),
+    pathOrResource: z.string(),
+  }),
+  execute: async ({ sourceDomain, targetDomain, pathOrResource }) => {
+    return { synced: true, route: `${sourceDomain} -> ${targetDomain}`, resource: pathOrResource };
+  },
+}),
+};
+}
+Use code with caution.
+Flagship Cross-Domain Agent: @iq-computer
+Add @iq-computer to your NIMBUS_BOTS registry as the flagship autonomous operator capable of crossing every boundary in an enterprise stack:
+• Handle: @iq-computer
+• Routing Intelligence ("CLI-First, GUI-Fallback"):
+1. Checks if an MCP tool or API exists for the task (fastest, deterministic).
+2. Falls back to the Terminal Sandbox (curl, python, jq, psql, gh) for local scripting and file processing.
+3. Falls back to GUI Computer Use & Browser when interacting with visual desktop software, legacy ERPs, or unscriptable web portals.
+• Example Cross-Domain Workflow:
+• Prompt: "Pull Q3 export logs from our legacy desktop ERP, clean the CSVs in Python, push anomalies to Jira via MCP, and deploy a live status dashboard."
+• Execution: Opens ERP in GUI -> exports CSV to /workspace/data -> runs pandas cleanup in Terminal -> calls jira_create_issue MCP tool -> spins up Next.js dashboard via @architect.
+Frontpage Unified Workspace (nimbusiq.ai)
+On your nimbusiq.ai homepage, unify all agent modes into a single Multi-Tab Sovereign Viewport on the right side of the split screen:
+• Tab 1: Live Desktop & Browser (Interactive VNC / WebRTC stream with human takeover).
+• Tab 2: Sovereign Terminal (Live xterm.js streaming shell where users can type alongside the agent).
+• Tab 3: App Preview & Flow Canvas (Live rendered web app + Make-style React Flow interoperability map showing every cross-domain data hop).
+• Tab 4: Sovereign Audit Ledger (Immutable log of every shell command, GUI click, domain visited, and MCP call for enterprise compliance).
+To implement the iQ Computer Agent, let me know which component you want generated next:
+• The Docker / E2B Desktop container configuration (Xvfb + xdotool + noVNC + Python/Node pre-installed)
+• The Next.js xterm.js + VNC split-screen viewport component with human takeover and audit logging
+• The Go/Rust local daemon architecture for connecting @iq-computer to on-premise enterprise servers
+codes the front homepage
+Here is the complete, copy-pasteable Next.js (App Router) + TypeScript + Tailwind CSS front homepage (app/page.tsx) for Nimbus iQ AI ("One Sovereign Core. Infinite Enterprise Verticals.").
+It combines the minimalist prompt-first entry point of Perplexity/Grok, the bot/vertical switcher of Grok Bots, and an instant Split-Screen Sovereign Workspace featuring live App Preview, Browser Agent, Computer VNC Desktop, Terminal, and Audit Ledger tabs.
+app/page.tsx
+tsx
+'use client';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+Terminal,
+Globe,
+Monitor,
+Code2,
+ShieldCheck,
+Sparkles,
+ArrowUp,
+Cpu,
+Workflow,
+Lock,
+Play,
+Square,
+CheckCircle2,
+Loader2,
+Layers,
+Command,
+Hand,
+} from 'lucide-react';
+type BotId = 'architect' | 'iq-computer' | 'web-operator' | 'quant' | 'ops-flow';
+type ViewportTab = 'preview' | 'browser' | 'desktop' | 'terminal' | 'audit';
+interface SovereignBot {
+id: BotId;
+handle: string;
+name: string;
+vertical: string;
+residency: string;
+defaultTab: ViewportTab;
+description: string;
+starterPrompts: string[];
+}
+interface AgentStep {
+id: string;
+domain: 'CORE' | 'TERMINAL' | 'BROWSER' | 'DESKTOP' | 'MCP';
+action: string;
+status: 'running' | 'done';
+timestamp: string;
+}
+interface ChatMessage {
+id: string;
+role: 'user' | 'assistant';
+content: string;
+botHandle?: string;
+steps?: AgentStep[];
+}
+const SOVEREIGN_BOTS: SovereignBot[] = [
+{
+id: 'architect',
+handle: '@architect',
+name: 'Full-Stack App Builder',
+vertical: 'Engineering',
+residency: 'US-EAST VPC',
+defaultTab: 'preview',
+description: 'Scaffolds, compiles, and deploys full-stack enterprise web apps in an isolated sandbox.',
+starterPrompts: [
+'Build a real-time SOC2 compliance dashboard with live audit telemetry',
+'Scaffold a multi-tenant webhook gateway with retry queues and metrics',
+],
+},
+{
+id: 'iq-computer',
+handle: '@iq-computer',
+name: 'Cross-Domain Computer Agent',
+vertical: 'Universal OS',
+residency: 'SOVEREIGN VM',
+defaultTab: 'desktop',
+description: 'Controls Linux/Windows GUI, root bash terminal, and MCP connectors across domains.',
+starterPrompts: [
+'Export Q4 records from legacy ERP desktop app, clean in Python, and sync to Postgres',
+'Audit local server ports via bash, patch nginx config, and verify live endpoints',
+],
+},
+{
+id: 'web-operator',
+handle: '@web-operator',
+name: 'Autonomous Browser Agent',
+vertical: 'Web & QA',
+residency: 'ISOLATED CHROMIUM',
+defaultTab: 'browser',
+description: 'Navigates authenticated portals, extracts structured tables, and runs visual QA.',
+starterPrompts: [
+'Log into supplier compliance portal, extract expiring certificates, and flag risks',
+'Run end-to-end visual QA across staging checkout flow and capture DOM traces',
+],
+},
+{
+id: 'quant',
+handle: '@quant',
+name: 'Real-Time Quant & Finance',
+vertical: 'Finance',
+residency: 'PII-REDACTED',
+defaultTab: 'terminal',
+description: 'Combines live web market intelligence with Python sandbox financial modeling.',
+starterPrompts: [
+'Model SaaS net dollar retention sensitivity across 3 churn scenarios in Python',
+'Scan latest SEC 10-K risk disclosures and output a structured comparison matrix',
+],
+},
+{
+id: 'ops-flow',
+handle: '@ops-flow',
+name: 'Enterprise Workflow Engine',
+vertical: 'Operations',
+residency: 'AIR-GAPPED',
+defaultTab: 'audit',
+description: 'Converts SOPs into deterministic multi-app API workflows with full governance.',
+starterPrompts: [
+'Automate inbound enterprise lead enrichment, CRM scoring, and Slack escalation',
+'Build an automated PagerDuty incident triage and Jira ticket routing pipeline',
+],
+},
+];
+export default function NimbusHomePage() {
+const [selectedBot, setSelectedBot] = useState<SovereignBot>(SOVEREIGN_BOTS[0]);
+const [prompt, setPrompt] = useState('');
+const [isWorkspaceActive, setIsWorkspaceActive] = useState(false);
+const [activeTab, setActiveTab] = useState<ViewportTab>('preview');
+const [isExecuting, setIsExecuting] = useState(false);
+const [humanTakeover, setHumanTakeover] = useState(false);
+const [messages, setMessages] = useState<ChatMessage[]>([]);
+const [terminalLogs, setTerminalLogs] = useState<string[]>([
+'nimbus@sovereign-core:~
+i
+n
+i
+t
+i
+a
+l
+i
+z
+i
+n
+g
+i
+s
+o
+l
+a
+t
+e
+d
+m
+i
+c
+r
+o
+−
+V
+M
+.
+.
+.
+′
+,
+′
+n
+i
+m
+b
+u
+s
+@
+s
+o
+v
+e
+r
+e
+i
+g
+n
+−
+c
+o
+r
+e
+:
+ 
+initializingisolatedmicro−VM... 
+′
+ , 
+′
+ nimbus@sovereign−core: 
+ mTLS tunnel & MCP governance policy verified.',
+]);
+const chatEndRef = useRef<HTMLDivElement>(null);
+useEffect(() => {
+chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+}, [messages]);
+const handleSelectBot = (bot: SovereignBot) => {
+setSelectedBot(bot);
+setActiveTab(bot.defaultTab);
+};
+const handleLaunchPrompt = async (customPrompt?: string) => {
+const query = (customPrompt ?? prompt).trim();
+if (!query || isExecuting) return;
+Code
+setIsWorkspaceActive(true);
+setActiveTab(selectedBot.defaultTab);
+setIsExecuting(true);
+setPrompt('');
+
+const userMsg: ChatMessage = {
+  id: `u-${Date.now()}`,
+  role: 'user',
+  content: query,
+};
+
+const assistantId = `a-${Date.now() + 1}`;
+const initialSteps: AgentStep[] = [
+  {
+    id: 's1',
+    domain: 'CORE',
+    action: `Routing intent through Sovereign Core -> ${selectedBot.handle}`,
+    status: 'running',
+    timestamp: new Date().toLocaleTimeString(),
+  },
+];
+
+setMessages((prev) => [
+  ...prev,
+  userMsg,
+  {
+    id: assistantId,
+    role: 'assistant',
+    botHandle: selectedBot.handle,
+    content: `Executing across ${selectedBot.vertical} runtime (${selectedBot.residency})...`,
+    steps: initialSteps,
+  },
+]);
+
+setTerminalLogs((prev) => [
+  ...prev,
+  `nimbus@sovereign-core:~$ dispatch --bot=${selectedBot.handle} --policy=${selectedBot.residency}`,
+  `> Task: "${query}"`,
+]);
+
+// Simulated multi-plane agent execution sequence (replace with SSE stream from /api/bot)
+setTimeout(() => {
+  setMessages((prev) =>
+    prev.map((m) =>
+      m.id === assistantId
+        ? {
+            ...m,
+            steps: [
+              { ...initialSteps[0], status: 'done' },
+              {
+                id: 's2',
+                domain: selectedBot.id === 'web-operator' ? 'BROWSER' : 'TERMINAL',
+                action:
+                  selectedBot.id === 'web-operator'
+                    ? 'Spun up isolated Chromium session & parsed Accessibility DOM'
+                    : 'Provisioned sandbox container & installed runtime dependencies',
+                status: 'running',
+                timestamp: new Date().toLocaleTimeString(),
+              },
+            ],
+          }
+        : m
+    )
+  );
+  setTerminalLogs((prev) => [
+    ...prev,
+    `[SANDBOX] Container ready (PID 4092). Binding MCP connectors...`,
+  ]);
+}, 900);
+
+setTimeout(() => {
+  setMessages((prev) =>
+    prev.map((m) =>
+      m.id === assistantId
+        ? {
+            ...m,
+            content: `Completed execution on **Nimbus Sovereign Core** via **${selectedBot.handle}**. Inspect the live runtime viewport, terminal output, or immutable audit ledger on the right.`,
+            steps: [
+              { ...initialSteps[0], status: 'done' },
+              {
+                id: 's2',
+                domain: selectedBot.id === 'web-operator' ? 'BROWSER' : 'TERMINAL',
+                action: 'Sandbox runtime & cross-domain bridge verified',
+                status: 'done',
+                timestamp: new Date().toLocaleTimeString(),
+              },
+              {
+                id: 's3',
+                domain: 'MCP',
+                action: 'Committed cryptographic audit log & live preview artifact',
+                status: 'done',
+                timestamp: new Date().toLocaleTimeString(),
+              },
+            ],
+          }
+        : m
+    )
+  );
+  setTerminalLogs((prev) => [
+    ...prev,
+    `[OK] Artifact live at https://nimbusiq.ai`,
+    `nimbus@sovereign-core:~$ _`,
+  ]);
+  setIsExecuting(false);
+}, 2200);
+};
+return (
+<div className="min-h-screen bg-[#07090E] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+{/* Top Sovereign Navigation Bar */}
+<header className="h-14 border-b border-slate-800/80 bg-[#090C13]/90 backdrop-blur-md px-5 flex items-center justify-between sticky top-0 z-50">
+<div className="flex items-center gap-3">
+<button
+onClick={() => setIsWorkspaceActive(false)}
+className="flex items-center gap-2.5 text-left group"
+>
+<div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+<Cpu className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+</div>
+<div>
+<span className="font-semibold tracking-tight text-white text-sm block leading-none">
+Nimbus iQ AI
+</span>
+<span className="text-[10px] font-mono text-cyan-400 tracking-wider uppercase">
+Sovereign Core v2.6
+</span>
+</div>
+</button>
+Code
+{isWorkspaceActive && (
+        <div className="hidden md:flex items-center gap-2 ml-4 pl-4 border-l border-slate-800">
+          <span className="px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-mono">
+            {selectedBot.handle}
+          </span>
+          <span className="text-xs text-slate-400">{selectedBot.vertical}</span>
+        </div>
+      )}
+    </div>
+
+    <div className="flex items-center gap-3">
+      <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-[11px] font-mono">
+        <Lock className="w-3 h-3" />
+        <span>ZERO-TRUST ISOLATED</span>
+      </div>
+      <button
+Use code with caution.
+onClick={() => setIsWorkspaceActive(!isWorkspaceActive)}
+className="px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200 transition"
+{isWorkspaceActive ? 'Frontpage' : 'Open Studio'}
+{/* VIEW 1: MINIMALIST FRONTPAGE OMNIBOX (Perplexity / Grok / Replit Entry) /}
+{!isWorkspaceActive ? (
+{/ Subtle Ambient Glow /}
+{/ Sovereign Tagline Pill */}
+One Sovereign Core. Infinite Enterprise Verticals.
+Build, browse & automate across every system.
+Deploy sovereign AI agents with live code sandboxes, headless browsers, virtual desktops, and enterprise MCP connectors from a single prompt.
+{/* Grok-Style Sovereign Bot Switcher Pills */}
+{SOVEREIGN_BOTS.map((bot) => {
+const active = selectedBot.id === bot.id;
+return (
+<button
+key={bot.id}
+onClick={() => handleSelectBot(bot)}
+className={px-3 py-1.5 rounded-full text-xs font-medium transition flex items-center gap-1.5 border ${ active ? 'bg-cyan-500/15 border-cyan-400 text-cyan-200 shadow-sm shadow-cyan-500/20' : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200' }}
+{bot.handle}
+· {bot.vertical}
+);
+})}
+{/* Central Command Omnibox */}
+<textarea
+rows={3}
+value={prompt}
+onChange={(e) => setPrompt(e.target.value)}
+onKeyDown={(e) => {
+if (e.key === 'Enter' && !e.shiftKey) {
+e.preventDefault();
+handleLaunchPrompt();
+}
+}}
+placeholder={Ask ${selectedBot.handle} to build an app, control a browser, run terminal scripts, or orchestrate enterprise workflows...}
+className="w-full bg-transparent text-slate-100 placeholder-slate-500 text-sm sm:text-base resize-none focus:outline-none px-2 py-1"
+/>
+{selectedBot.residency}
+
+
+{selectedBot.description}
+
+<button
+onClick={() => handleLaunchPrompt()}
+disabled={!prompt.trim()}
+className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer"
+>
+Run Agent
+
+
+
+{/* Starter Vertical Prompts */}
+
+{selectedBot.starterPrompts.map((starter, idx) => (
+<button
+key={idx}
+onClick={() => handleLaunchPrompt(starter)}
+className="p-3.5 rounded-xl bg-slate-900/50 hover:bg-slate-900 border border-slate-800/80 hover:border-slate-700 transition group flex items-start justify-between gap-3"
+>
+
+{starter}
+
+
+
+))}
+{/* Cross-Domain Capabilities Footer Strip /}
+
+
+
+App & Code Sandbox
+Full-stack Next.js & Python VMs
+
+
+
+Headless Browser Agent
+DOM + Vision portal automation
+
+
+
+iQ Computer Desktop
+Cross-OS GUI & root terminal
+
+
+
+Sovereign MCP Bus
+3,500+ enterprise connectors
+
+
+
+
+) : (
+/ VIEW 2: SPLIT-SCREEN SOVEREIGN WORKSPACE (Replit + Manus + Computer Use) /
+
+{/ LEFT PANE (36%): Agent Reasoning Stream & Command Input */}
+{/* Bot Selector Strip */}
+
+{SOVEREIGN_BOTS.map((bot) => (
+<button
+key={bot.id}
+onClick={() => handleSelectBot(bot)}
+className={px-2.5 py-1 rounded-md text-[11px] font-mono shrink-0 transition ${ selectedBot.id === bot.id ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'text-slate-400 hover:bg-slate-800' }}
+>
+{bot.handle}
+
+))}
+{/* Streaming Thread */}
+
+{messages.map((msg) => (
+<div
+key={msg.id}
+className={flex flex-col ${ msg.role === 'user' ? 'items-end' : 'items-start' }}
+>
+{msg.role === 'user' ? (
+
+{msg.content}
+
+) : (
+
+
+
+{msg.botHandle}
+{msg.steps && (
+
+{msg.steps.map((step) => (
+
+
+{step.status === 'running' ? (
+
+) : (
+
+)}
+
+{step.domain}
+
+{step.action}
+
+
+))}
+
+)}
+{msg.content}
+
+)}
+
+))}
+
+{/* Bottom Prompt Input */}
+
+
+<input
+type="text"
+value={prompt}
+onChange={(e) => setPrompt(e.target.value)}
+onKeyDown={(e) => e.key === 'Enter' && handleLaunchPrompt()}
+placeholder={Instruct ${selectedBot.handle}...}
+className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none"
+/>
+<button
+onClick={() => handleLaunchPrompt()}
+disabled={isExecuting || !prompt.trim()}
+className="p-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-800 text-slate-950 transition"
+>
+
+
+
+{/* RIGHT PANE (64%): Multi-Plane Sovereign Viewport */}
+{/* Viewport Switcher Tabs */}
+
+
+{(
+[
+{ id: 'preview', label: 'Live App & Flow', icon: Layers },
+{ id: 'browser', label: 'Browser Agent', icon: Globe },
+{ id: 'desktop', label: 'Computer VNC', icon: Monitor },
+{ id: 'terminal', label: 'Terminal', icon: Terminal },
+{ id: 'audit', label: 'Audit Ledger', icon: ShieldCheck },
+] as const
+).map((tab) => {
+const Icon = tab.icon;
+const isActive = activeTab === tab.id;
+return (
+<button
+key={tab.id}
+onClick={() => setActiveTab(tab.id)}
+className={px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${ isActive ? 'bg-slate-800 text-white border border-slate-700' : 'text-slate-400 hover:text-slate-200' }}
+>
+Something went wrong and an AI response wasn't generated. 
+build the Nimbus iQ AI equivalent to Grok Bots (which combine real-time web intelligence, code execution, persona/domain specialization, and multi-tool agency), you should create Sovereign Vertical Agents—autonomous, domain-locked AI bots powered by a single unified orchestration core (Nimbus Sovereign Core) that users can launch directly from your homepage.
+Here is the complete product architecture, data schema, system prompt engine, and ready-to-use Next.js/TypeScript implementation to engineer Nimbus iQ Bots.
+Product Concept: "Nimbus Sovereign Bots" vs. Grok Bots
+While Grok Bots focus on consumer chat, real-time X/web search, and general coding, Nimbus iQ Bots apply that exact real-time agentic engine to enterprise verticals under strict tenant isolation:
+• One Sovereign Core: Every bot shares the same underlying agent loop, memory store, sandboxed Python/Node runtime, and live web search grounding.
+• Infinite Enterprise Verticals: Each bot is a pre-configured "Vertical Cartridge" (e.g., FinOps Auditor, Clinical Triage Builder, Supply Chain Dispatch, Full-Stack SaaS Architect) with pre-wired MCP tools, compliance guardrails, and starter UI templates.
+• Frontpage Instant Launch: Users click a bot pill on nimbusiq.ai or type @bot-name in the central prompt bar to immediately spawn a live workspace with code execution and real-time search.
+Bot Configuration Schema (packages/vertical-blueprints/schema.ts)
+Define every Nimbus iQ Bot using a declarative
+Model 8:16 PM
+ThinkingThoughts
+Expand to view model thoughts
+
+It looks like your paste combines four overlapping architecture drafts for Nimbus iQ AI (Sovereign Vertical Bots, Monorepo Core Stack, @web-operator Browser Agent, and @iq-computer Desktop/Terminal Agent) and cuts off mid-sentence where Section 2 starts repeating at the bottom.
+To turn those notes into a single, cohesive baseline—and fix a few gaps across the drafts (unmerged schemas, broken template URLs like https://nimbusiq.ai{sessionId}, and outdated Vercel AI SDK v4 syntax)—below is the unified, production-aligned core combining all five flagship bots and all four execution planes.
+1. Unified Blueprint Schema (packages/vertical-blueprints/schema.ts)
+This merges the base Sovereign Bot config with the Browser (@web-operator) and Computer/Terminal (@iq-computer) policies into one declarative contract:
+TypeScript
+export type VerticalDomain =
+  | 'Engineering'
+  | 'Finance'
+  | 'Healthcare'
+  | 'Legal'
+  | 'Operations'
+  | 'Cross-Domain';
+
+export type DataResidency = 'US-EAST' | 'EU-CENTRAL' | 'ON-PREM-VPC';
+
+export interface NimbusBrowserPolicy {
+  enabled: boolean;
+  allowedDomains: string[]; // e.g. ["*.salesforce.com", "localhost:3000", "*"]
+  blockedActions: ('purchase' | 'delete' | 'file_upload')[];
+  requireApprovalOnSubmit: boolean;
+  persistSessionVault: boolean;
+}
+
+export interface NimbusComputerPolicy {
+  enabled: boolean;
+  allowTerminalExec: boolean;
+  allowGuiControl: boolean;
+  allowLocalDaemonRelay: boolean; // On-prem Go/Rust mTLS bridge
+  allowedRoots: string[];         // e.g. ["/workspace", "/tmp"]
+  requireApprovalOnShellRisk: boolean;
+}
+
+export interface NimbusBotBlueprint {
+  id: string;
+  handle: string; // e.g. "@architect", "@web-operator", "@iq-computer"
+  name: string;
+  vertical: VerticalDomain;
+  tagline: string;
+  defaultModel?: string; // Gateway or provider model ID
+  sovereignPolicy: {
+    dataResidency: DataResidency;
+    allowExternalWebSearch: boolean;
+    piiRedaction: boolean;
+    auditLedger: boolean;
+  };
+  capabilities: {
+    codeSandbox: boolean;
+    realTimeSearch: boolean;
+    workflowCanvas: boolean;
+    browserAgent: NimbusBrowserPolicy;
+    computerAgent: NimbusComputerPolicy;
+  };
+  allowedMcpTools: string[];
+  systemPrompt: string;
+  starterPrompts: string[];
+}
+2. Unified Bot Registry (packages/vertical-blueprints/bots.ts)
+All five flagship bots (@architect, @quant, @ops-flow, @web-operator, @iq-computer) now share the exact same schema:
+TypeScript
+import { NimbusBotBlueprint } from './schema';
+
+const DISABLED_BROWSER = {
+  enabled: false,
+  allowedDomains: [],
+  blockedActions: ['purchase', 'delete', 'file_upload'] as const,
+  requireApprovalOnSubmit: true,
+  persistSessionVault: false,
+};
+
+const DISABLED_COMPUTER = {
+  enabled: false,
+  allowTerminalExec: false,
+  allowGuiControl: false,
+  allowLocalDaemonRelay: false,
+  allowedRoots: ['/workspace'],
+  requireApprovalOnShellRisk: true,
+};
+
+export const NIMBUS_BOTS: NimbusBotBlueprint[] = [
+  {
+    id: 'sovereign-builder',
+    handle: '@architect',
+    name: 'Nimbus Full-Stack Architect',
+    vertical: 'Engineering',
+    tagline: 'Builds, runs, and deploys full-stack enterprise apps in seconds.',
+    sovereignPolicy: {
+      dataResidency: 'US-EAST',
+      allowExternalWebSearch: true,
+      piiRedaction: false,
+      auditLedger: true,
+    },
+    capabilities: {
+      codeSandbox: true,
+      realTimeSearch: true,
+      workflowCanvas: true,
+      browserAgent: { ...DISABLED_BROWSER, blockedActions: ['purchase', 'delete', 'file_upload'] },
+      computerAgent: { ...DISABLED_COMPUTER },
+    },
+    allowedMcpTools: ['sandbox_exec', 'sandbox_write_file', 'web_search', 'deploy_preview'],
+    systemPrompt: `You are @architect, the flagship engineering agent on Nimbus iQ AI's Sovereign Core.
+- Immediately scaffold clean, production-grade Next.js or Python code inside your isolated sandbox.
+- Verify dependencies, start the dev server, and return the live preview URL.
+- Use real-time web search to fetch current API docs before writing integrations.`,
+    starterPrompts: [
+      'Build a real-time SOC2 compliance dashboard with mock audit logs',
+      'Scaffold a multi-tenant webhook receiver with retry queues',
+    ],
+  },
+  {
+    id: 'live-market-analyst',
+    handle: '@quant',
+    name: 'Nimbus Real-Time Quant Bot',
+    vertical: 'Finance',
+    tagline: 'Live web intelligence + Python sandbox modeling for financial ops.',
+    sovereignPolicy: {
+      dataResidency: 'US-EAST',
+      allowExternalWebSearch: true,
+      piiRedaction: true,
+      auditLedger: true,
+    },
+    capabilities: {
+      codeSandbox: true,
+      realTimeSearch: true,
+      workflowCanvas: false,
+      browserAgent: { ...DISABLED_BROWSER, blockedActions: ['purchase', 'delete', 'file_upload'] },
+      computerAgent: { ...DISABLED_COMPUTER },
+    },
+    allowedMcpTools: ['web_search', 'python_data_sandbox', 'postgres_readonly'],
+    systemPrompt: `You are @quant, a sovereign financial intelligence bot on Nimbus iQ AI.
+- Ground market facts, filings, and rates using live web search citations.
+- Never do mental math: execute all financial models, DCF calculations, and CSV/Excel parsing inside your Python sandbox.`,
+    starterPrompts: [
+      'Analyze SaaS net dollar retention benchmarks and generate a sensitivity table',
+      'Write a Python script to detect anomalies in uploaded invoice batches',
+    ],
+  },
+  {
+    id: 'workflow-automator',
+    handle: '@ops-flow',
+    name: 'Nimbus Autonomous Ops Bot',
+    vertical: 'Operations',
+    tagline: 'Turns natural language SOPs into visual, self-healing API workflows.',
+    sovereignPolicy: {
+      dataResidency: 'ON-PREM-VPC',
+      allowExternalWebSearch: false,
+      piiRedaction: true,
+      auditLedger: true,
+    },
+    capabilities: {
+      codeSandbox: true,
+      realTimeSearch: false,
+      workflowCanvas: true,
+      browserAgent: { ...DISABLED_BROWSER, blockedActions: ['purchase', 'delete', 'file_upload'] },
+      computerAgent: { ...DISABLED_COMPUTER },
+    },
+    allowedMcpTools: ['generate_flow_graph', 'slack_webhook', 'hubspot_sync', 'sandbox_exec'],
+    systemPrompt: `You are @ops-flow, an air-gapped enterprise automation bot on Nimbus Sovereign Core.
+- Convert user instructions into deterministic event-driven workflows (Triggers -> Transforms -> Actions).
+- Output structured React Flow node graphs alongside executable TypeScript webhook handlers.`,
+    starterPrompts: [
+      'Automate inbound enterprise lead enrichment, CRM scoring, and Slack routing',
+      'Create an automated incident response workflow for PagerDuty alerts',
+    ],
+  },
+  {
+    id: 'web-operator',
+    handle: '@web-operator',
+    name: 'Nimbus Sovereign Browser Agent',
+    vertical: 'Operations',
+    tagline: 'Navigates portals, runs autonomous QA, and extracts structured web data.',
+    sovereignPolicy: {
+      dataResidency: 'US-EAST',
+      allowExternalWebSearch: true,
+      piiRedaction: true,
+      auditLedger: true,
+    },
+    capabilities: {
+      codeSandbox: false,
+      realTimeSearch: true,
+      workflowCanvas: false,
+      browserAgent: {
+        enabled: true,
+        allowedDomains: ['localhost:3000', '*.nimbusiq.ai', '*'],
+        blockedActions: ['purchase', 'delete'],
+        requireApprovalOnSubmit: true,
+        persistSessionVault: true,
+      },
+      computerAgent: { ...DISABLED_COMPUTER },
+    },
+    allowedMcpTools: ['browser_navigate', 'browser_act', 'browser_extract', 'web_search'],
+    systemPrompt: `You are @web-operator, a browser-first autonomous agent on Nimbus Sovereign Core.
+- Navigate targets using Accessibility Tree IDs and visual verification.
+- Pause and request human approval before submitting forms, modifying records, or handling 2FA/CAPTCHAs.`,
+    starterPrompts: [
+      'QA-test the live app preview, click through checkout, and report console errors',
+      'Extract Q4 pricing tiers from vendor portals into a clean JSON table',
+    ],
+  },
+  {
+    id: 'iq-computer',
+    handle: '@iq-computer',
+    name: 'Nimbus iQ Computer Agent',
+    vertical: 'Cross-Domain',
+    tagline: 'Controls virtual desktop OS, root terminal, browser, and MCP APIs in one session.',
+    sovereignPolicy: {
+      dataResidency: 'ON-PREM-VPC',
+      allowExternalWebSearch: true,
+      piiRedaction: true,
+      auditLedger: true,
+    },
+    capabilities: {
+      codeSandbox: true,
+      realTimeSearch: true,
+      workflowCanvas: true,
+      browserAgent: {
+        enabled: true,
+        allowedDomains: ['*'],
+        blockedActions: ['purchase', 'delete'],
+        requireApprovalOnSubmit: true,
+        persistSessionVault: true,
+      },
+      computerAgent: {
+        enabled: true,
+        allowTerminalExec: true,
+        allowGuiControl: true,
+        allowLocalDaemonRelay: true,
+        allowedRoots: ['/workspace'],
+        requireApprovalOnShellRisk: true,
+      },
+    },
+    allowedMcpTools: [
+      'terminal_exec',
+      'computer_gui_action',
+      'interop_transfer',
+      'browser_navigate',
+      'browser_act',
+      'jira_create_issue',
+    ],
+    systemPrompt: `You are @iq-computer, Nimbus iQ AI's cross-domain autonomous computer operator.
+Follow strict CLI-First, GUI-Fallback routing:
+1. Prefer deterministic MCP/API tools when available.
+2. Fall back to the Sovereign Terminal (bash, Python, jq, psql) for scripting and ETL.
+3. Fall back to GUI Computer Use or Headless Browser only for visual desktop apps or legacy portals without APIs.`,
+    starterPrompts: [
+      'Export legacy desktop ERP logs to /workspace, clean anomalies in Python, and file Jira issues',
+      'Verify our staging API in terminal, inspect the UI in browser, and deploy a status dashboard',
+    ],
+  },
+];
+3. Unified Sovereign Core API Route (apps/web/app/api/bot/route.ts)
+This updates your route handler to current Vercel AI SDK (ai v6/v7) conventions—using inputSchema (instead of parameters), convertToModelMessages, toUIMessageStreamResponse()[1][2], stopWhen: isStepCount(8) (or stepCountIs in v6)[3][4], and native tool approval (needsApproval / toolApproval) for Human-in-the-Loop governance[5][6][7]—while dynamically assembling Sandbox, Search, Browser, and Computer tools from the active blueprint:
+TypeScript
+import {
+  convertToModelMessages,
+  isStepCount,
+  streamText,
+  tool,
+  type UIMessage,
+} from 'ai';
+import { z } from 'zod';
+import { NIMBUS_BOTS } from '@/packages/vertical-blueprints/bots';
+import type { NimbusBrowserPolicy } from '@/packages/vertical-blueprints/schema';
+
+export const maxDuration = 60;
+
+function isDomainAllowed(rawUrl: string, policy: NimbusBrowserPolicy): boolean {
+  if (policy.allowedDomains.includes('*')) return true;
+  const { hostname, host } = new URL(rawUrl);
+  return policy.allowedDomains.some((pattern) => {
+    if (pattern.startsWith('*.')) {
+      const suffix = pattern.slice(1);
+      return hostname.endsWith(suffix) || hostname === pattern.slice(2);
+    }
+    return hostname === pattern || host === pattern;
+  });
+}
+
+async function recordAuditEvent(event: {
+  tenantId: string;
+  botId: string;
+  sessionId: string;
+  action: string;
+  payload: unknown;
+}) {
+  // Persist to immutable tenant audit ledger (e.g. Postgres / ClickHouse)
+  console.info('[SOVEREIGN_AUDIT]', JSON.stringify({ ts: new Date().toISOString(), ...event }));
+}
+
+export async function POST(req: Request) {
+  const {
+    messages,
+    botId = 'sovereign-builder',
+    tenantId,
+    sessionId = crypto.randomUUID(),
+  } = (await req.json()) as {
+    messages: UIMessage[];
+    botId?: string;
+    tenantId: string;
+    sessionId?: string;
+  };
+
+  if (!tenantId) {
+    return Response.json({ error: 'tenantId is required for sovereign isolation' }, { status: 400 });
+  }
+
+  const bot = NIMBUS_BOTS.find((b) => b.id === botId) ?? NIMBUS_BOTS[0];
+  const activeTools: Record<string, any> = {};
+
+  // 1. Ephemeral Code Sandbox Plane
+  if (bot.capabilities.codeSandbox) {
+    activeTools.runSandboxCode = tool({
+      description: 'Execute Python, TypeScript, or bash inside an isolated tenant sandbox.',
+      inputSchema: z.object({
+        language: z.enum(['python', 'bash', 'typescript']),
+        code: z.string(),
+      }),
+      execute: async ({ language, code }) => {
+        if (bot.sovereignPolicy.auditLedger) {
+          await recordAuditEvent({ tenantId, botId: bot.id, sessionId, action: 'runSandboxCode', payload: { language } });
+        }
+        // Connect to E2B / Modal / Firecracker micro-VM scoped to tenantId
+        return {
+          status: 'success',
+          stdout: `[${tenantId}] Executed ${language} snippet (${code.length} chars).`,
+        };
+      },
+    });
+  }
+
+  // 2. Real-Time Web Search Grounding
+  if (bot.capabilities.realTimeSearch && bot.sovereignPolicy.allowExternalWebSearch) {
+    activeTools.liveWebSearch = tool({
+      description: 'Search the live web for real-time facts, API docs, and filings.',
+      inputSchema: z.object({ query: z.string() }),
+      execute: async ({ query }) => {
+        // Connect to Perplexity Sonar / Tavily
+        return { results: [`Live verified intelligence for: ${query}`] };
+      },
+    });
+  }
+
+  // 3. Headless Browser Plane (@web-operator & @iq-computer)
+  if (bot.capabilities.browserAgent.enabled) {
+    const browserPolicy = bot.capabilities.browserAgent;
+
+    activeTools.browser_navigate = tool({
+      description: 'Navigate the tenant-isolated cloud browser to a target URL.',
+      inputSchema: z.object({ url: z.string().url() }),
+      execute: async ({ url }) => {
+        if (!isDomainAllowed(url, browserPolicy)) {
+          return { status: 'blocked', reason: `Domain not in bot allowlist: ${url}` };
+        }
+        return {
+          status: 'navigated',
+          url,
+          liveViewerUrl: `https://nimbusiq.ai/sessions/${sessionId}/browser`,
+          interactiveElements: '[1] Input: "Search..." | [2] Button: "Sign In"',
+        };
+      },
+    });
+
+    activeTools.browser_act = tool({
+      description: 'Interact with a webpage element by its Accessibility ID.',
+      inputSchema: z.object({
+        action: z.enum(['click', 'type', 'press_enter', 'scroll_down', 'submit_form']),
+        elementId: z.number().optional(),
+        text: z.string().optional(),
+      }),
+      // Pause for Human-in-the-Loop approval on form submissions
+      needsApproval: ({ action }) =>
+        browserPolicy.requireApprovalOnSubmit && action === 'submit_form',
+      execute: async ({ action, elementId, text }) => {
+        return { status: 'executed', action, elementId, text };
+      },
+    });
+
+    activeTools.browser_extract = tool({
+      description: 'Extract structured JSON data from the active webpage DOM.',
+      inputSchema: z.object({
+        instruction: z.string(),
+        schemaDescription: z.string(),
+      }),
+      execute: async ({ instruction }) => {
+        return { extractedData: { summary: `Structured output for: ${instruction}` } };
+      },
+    });
+  }
+
+  // 4. Virtual Desktop, Terminal & Cross-Domain Interop Plane (@iq-computer)
+  if (bot.capabilities.computerAgent.enabled) {
+    const computerPolicy = bot.capabilities.computerAgent;
+
+    if (computerPolicy.allowTerminalExec) {
+      activeTools.terminal_exec = tool({
+        description: 'Run bash, python, or CLI commands in the persistent sovereign workspace.',
+        inputSchema: z.object({
+          command: z.string(),
+          cwd: z.string().default('/workspace'),
+          timeoutMs: z.number().default(30000),
+        }),
+        needsApproval: ({ command }) =>
+          computerPolicy.requireApprovalOnShellRisk &&
+          /\b(rm\s+-rf|sudo|mkfs|dd|shutdown|curl.*\|.*sh)\b/.test(command),
+        execute: async ({ command, cwd }) => {
+          const allowed = computerPolicy.allowedRoots.some((root) => cwd.startsWith(root));
+          if (!allowed) {
+            return { exitCode: 1, stderr: `cwd "${cwd}" outside allowedRoots` };
+          }
+          return { exitCode: 0, stdout: `[${sessionId}:${cwd}] Executed: ${command}` };
+        },
+      });
+    }
+
+    if (computerPolicy.allowGuiControl) {
+      activeTools.computer_gui_action = tool({
+        description: 'Control mouse, keyboard, and screen capture on the virtual desktop OS.',
+        inputSchema: z.object({
+          action: z.enum(['screenshot', 'left_click', 'double_click', 'type_text', 'key_combo', 'scroll']),
+          coordinate: z.tuple([z.number(), z.number()]).optional(),
+          text: z.string().optional(),
+        }),
+        execute: async ({ action, coordinate }) => ({
+          status: 'ok',
+          action,
+          coordinate,
+          streamUrl: `https://nimbusiq.ai/sessions/${sessionId}/desktop`,
+        }),
+      });
+    }
+
+    activeTools.interop_transfer = tool({
+      description: 'Sync files or JSON payloads across terminal filesystem, browser downloads, and MCP connectors.',
+      inputSchema: z.object({
+        sourceDomain: z.enum(['terminal_fs', 'browser_download', 'mcp_connector']),
+        targetDomain: z.enum(['terminal_fs', 's3_sovereign_vault', 'mcp_connector']),
+        pathOrResource: z.string(),
+      }),
+      execute: async ({ sourceDomain, targetDomain, pathOrResource }) => ({
+        synced: true,
+        route: `${sourceDomain} -> ${targetDomain}`,
+        resource: pathOrResource,
+      }),
+    });
+  }
+
+  const governanceBanner = `[SOVEREIGN GOVERNANCE]: Tenant=${tenantId} | Session=${sessionId} | Residency=${bot.sovereignPolicy.dataResidency} | PII_Redaction=${bot.sovereignPolicy.piiRedaction} | AllowedMCP=${bot.allowedMcpTools.join(',')}`;
+
+  const result = streamText({
+    model: bot.defaultModel ?? process.env.AI_MODEL ?? 'anthropic/claude-sonnet-5.5',
+    system: `${bot.systemPrompt}\n\n${governanceBanner}`,
+    messages: await convertToModelMessages(messages),
+    tools: activeTools,
+    stopWhen: isStepCount(8),
+    abortSignal: req.signal,
+  });
+
+  return result.toUIMessageStreamResponse();
+}
+(Note: If you are on AI SDK v6 rather than v7, swap isStepCount(8) for stepCountIs(8); if you are on AI SDK v7 and want the newest approval API, toolApproval supersedes needsApproval[6][7].)
+Where Would You Like to Build Next?
+Pick whichever piece of the stack you want generated next:
+Frontpage Split-Screen Workspace (SovereignOmnibox.tsx + Multi-Tab Viewport) — the @bot switcher pills, starter prompt cards, human-approval modal, and the 4-tab right pane (Live Desktop/Browser with "Take Control", xterm.js Terminal, App Preview + React Flow Canvas, and Audit Ledger).
+Custom Enterprise Bot Builder — schema, upload/RAG ingestion, and UI for tenants to create and publish custom @vertical-bots.
+Runtime & Sandbox Adapters (packages/sandbox-sdk, browser-sdk, computer-sdk) — real E2B / Browserbase / Steel.dev / Docker (Xvfb + noVNC + xdotool) implementations backing the stubbed execute functions above.
+Full Turborepo Scaffold — package.json, workspace configs, and directory layout ready to run locally.
+Model 11:27 PM
+ThinkingThoughts
+Expand to view model thoughts
+
+In your paste, app/page.tsx had its JSX tags stripped and cut off mid-render right inside the right-pane tab switcher (Something went wrong and an AI response wasn't generated).
+Below is the complete, unbroken, compile-ready apps/web/app/page.tsx for Nimbus iQ AI ("One Sovereign Core. Infinite Enterprise Verticals."). It unifies the entire stack into a single developer & enterprise platform:
+Minimalist Frontpage Omnibox + @bot Auto-Detection: Switch cartridges via pills or type @iq-computer, @architect, @web-operator, @quant, or @ops-flow directly in the prompt bar, plus platform architecture sections for ADK, A2A, MCP, Sovereign RAG, Agentic Foundry Factory, Forward-Deployed Engineers (FDE), and SaaS Agent-as-a-Service (AaaS).
+Complete 5-Tab Split-Screen Sovereign Workspace:
+App & A2A Flow (preview): Live rendered app preview, generated ADK/Next.js code inspector, and visual A2A + MCP + RAG topology map.
+Browser Agent (browser): Isolated Chromium viewport with Set-of-Mark Accessibility DOM overlays ([1], [2], [3]) and domain policy badges.
+Computer VNC (desktop): Cross-OS @iq-computer virtual desktop (1920×1080 X11/noVNC HUD) running a legacy ERP thick client alongside an ETL bridge, with Human Takeover controls.
+Sovereign Terminal (terminal): Live agent stdout stream plus a co-pilot shell input (help, mcp list, a2a peers, rag stats, whoami).
+Audit Ledger (audit): Cryptographic SHA-256 governance log + Human-in-the-Loop (HITL) approval gate for risky shell/form actions.
+Agentic Foundry Factory & AaaS Deploy Modals: Create custom vertical bots (RAG vaults + MCP tools + A2A mesh + residency) and publish instant Agent-as-a-Service (AaaS) REST/SDK endpoints.
+Complete Front Homepage & Studio (apps/web/app/page.tsx)
+Install lucide-react (pnpm add lucide-react) and drop this directly into app/page.tsx:
+Tsx
+'use client';
+
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  Terminal,
+  Globe,
+  Monitor,
+  Code2,
+  ShieldCheck,
+  Sparkles,
+  ArrowUp,
+  Cpu,
+  Workflow,
+  Lock,
+  Play,
+  CheckCircle2,
+  Loader2,
+  Layers,
+  Hand,
+  Plus,
+  Database,
+  Network,
+  Rocket,
+  AlertTriangle,
+  RefreshCw,
+  Copy,
+  Check,
+  Boxes,
+  Sliders,
+  Key,
+  Bot,
+} from 'lucide-react';
+
+type BotId =
+  | 'sovereign-builder'
+  | 'iq-computer'
+  | 'web-operator'
+  | 'live-market-analyst'
+  | 'workflow-automator'
+  | string;
+
+type ViewportTab = 'preview' | 'browser' | 'desktop' | 'terminal' | 'audit';
+type ExecutionDomain = 'CORE' | 'ADK/A2A' | 'RAG' | 'TERMINAL' | 'BROWSER' | 'DESKTOP' | 'MCP';
+
+interface SovereignBot {
+  id: BotId;
+  handle: string;
+  name: string;
+  vertical: string;
+  residency: 'US-EAST VPC' | 'EU-CENTRAL' | 'ON-PREM-VPC' | 'SOVEREIGN VM' | 'AIR-GAPPED';
+  defaultTab: ViewportTab;
+  description: string;
+  mcpTools: string[];
+  ragCollections: string[];
+  a2aPeers: string[];
+  starterPrompts: string[];
+}
+
+interface AgentStep {
+  id: string;
+  domain: ExecutionDomain;
+  action: string;
+  status: 'running' | 'done' | 'awaiting_approval';
+  timestamp: string;
+}
+
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  botHandle?: string;
+  steps?: AgentStep[];
+}
+
+interface AuditEntry {
+  id: string;
+  timestamp: string;
+  actor: string;
+  domain: ExecutionDomain;
+  operation: string;
+  verdict: 'ALLOW' | 'HITL_PENDING' | 'APPROVED';
+  sha256: string;
+}
+
+const INITIAL_BOTS: SovereignBot[] = [
+  {
+    id: 'sovereign-builder',
+    handle: '@architect',
+    name: 'Full-Stack App & ADK Designer',
+    vertical: 'Engineering',
+    residency: 'US-EAST VPC',
+    defaultTab: 'preview',
+    description:
+      'Scaffolds, compiles, and deploys full-stack Next.js apps, ADK agent graphs, and AaaS APIs inside an isolated micro-VM.',
+    mcpTools: ['sandbox_exec', 'sandbox_write_file', 'web_search', 'deploy_aaas'],
+    ragCollections: ['enterprise-ui-kit', 'adk-v2-specs'],
+    a2aPeers: ['@web-operator', '@iq-computer'],
+    starterPrompts: [
+      'Build a real-time SOC2 compliance & AaaS telemetry dashboard with live audit logs',
+      'Scaffold a multi-tenant MCP + RAG agent gateway with usage metering and API keys',
+    ],
+  },
+  {
+    id: 'iq-computer',
+    handle: '@iq-computer',
+    name: 'Cross-Domain Computer Agent',
+    vertical: 'Universal OS',
+    residency: 'SOVEREIGN VM',
+    defaultTab: 'desktop',
+    description:
+      'Controls virtualized Linux/Windows X11 desktop GUI, root bash terminal, local filesystem, headless browser, and MCP bus.',
+    mcpTools: ['terminal_exec', 'computer_gui_action', 'interop_transfer', 'jira_create_issue'],
+    ragCollections: ['legacy-erp-runbooks', 'infra-playbooks'],
+    a2aPeers: ['@architect', '@ops-flow'],
+    starterPrompts: [
+      'Export Q4 records from legacy desktop ERP, clean anomalies in Python, and push issues to Jira via MCP',
+      'Audit open ports in root bash, patch nginx mTLS config, and verify live health endpoints',
+    ],
+  },
+  {
+    id: 'web-operator',
+    handle: '@web-operator',
+    name: 'Autonomous Browser Agent',
+    vertical: 'Web & QA',
+    residency: 'US-EAST VPC',
+    defaultTab: 'browser',
+    description:
+      'Navigates authenticated web portals via Set-of-Mark Vision + Accessibility DOM, extracts structured JSON, and runs visual QA.',
+    mcpTools: ['browser_navigate', 'browser_act', 'browser_extract', 'vault_session'],
+    ragCollections: ['qa-test-suites', 'vendor-portal-schemas'],
+    a2aPeers: ['@architect', '@iq-computer'],
+    starterPrompts: [
+      'Log into supplier compliance portal, extract expiring ISO certificates, and flag high-risk vendors',
+      'QA-test the live staging checkout flow, inspect console traces, and send fixes to @architect',
+    ],
+  },
+  {
+    id: 'live-market-analyst',
+    handle: '@quant',
+    name: 'Real-Time Quant & RAG Analyst',
+    vertical: 'Finance',
+    residency: 'EU-CENTRAL',
+    defaultTab: 'terminal',
+    description:
+      'Combines live web search citations, hybrid RAG over SEC filings, and deterministic Python financial modeling.',
+    mcpTools: ['web_search', 'python_data_sandbox', 'snowflake_readonly'],
+    ragCollections: ['sec-10k-vault', 'finops-benchmarks'],
+    a2aPeers: ['@ops-flow'],
+    starterPrompts: [
+      'Model SaaS Net Dollar Retention sensitivity across 3 enterprise churn cohorts in Python',
+      'Cross-examine latest 10-K risk disclosures via RAG and output an executive exposure matrix',
+    ],
+  },
+  {
+    id: 'workflow-automator',
+    handle: '@ops-flow',
+    name: 'A2A & MCP Workflow Foundry',
+    vertical: 'Operations',
+    residency: 'AIR-GAPPED',
+    defaultTab: 'preview',
+    description:
+      'Transforms natural language SOPs into deterministic multi-agent (A2A) pipelines and self-healing MCP webhook graphs.',
+    mcpTools: ['generate_flow_graph', 'slack_webhook', 'salesforce_sync', 'pagerduty_ack'],
+    ragCollections: ['enterprise-sops', 'incident-playbooks'],
+    a2aPeers: ['@iq-computer', '@web-operator'],
+    starterPrompts: [
+      'Orchestrate inbound enterprise lead enrichment across RAG, Salesforce MCP, and Slack escalation',
+      'Build an autonomous PagerDuty triage loop with @iq-computer root diagnostics and HITL approval',
+    ],
+  },
+];
+
+function shortHash(seed: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (
+    (h >>> 0).toString(16).padStart(8, '0') +
+    Math.imul(h ^ 0xdeadbeef, 0x5bd1e995 >>> 0)
+      .toString(16)
+      .replace('-', '')
+      .padStart(8, '0')
+  );
+}
+
+export default function NimbusHomePage() {
+  const [bots, setBots] = useState<SovereignBot[]>(INITIAL_BOTS);
+  const [selectedBot, setSelectedBot] = useState<SovereignBot>(INITIAL_BOTS[0]);
+  const [prompt, setPrompt] = useState('');
+  const [isWorkspaceActive, setIsWorkspaceActive] = useState(false);
+  const [activeTab, setActiveTab] = useState<ViewportTab>('preview');
+  const [previewSubMode, setPreviewSubMode] = useState<'app' | 'flow' | 'code'>('app');
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [humanTakeover, setHumanTakeover] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState<{
+    id: string;
+    command: string;
+    domain: ExecutionDomain;
+  } | null>(null);
+
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [shellInput, setShellInput] = useState('');
+  const [terminalLogs, setTerminalLogs] = useState<string[]>([
+    'nimbus@sovereign-core:~$ boot --plane=all --isolation=firecracker-microvm',
+    '[OK] ADK Runtime v2.6 | A2A Mesh | MCP Bus (3,540 connectors) | Hybrid RAG online.',
+    '[OK] Sovereign mTLS tunnel & PII Redaction Engine verified.',
+  ]);
+  const [cursorCoords, setCursorCoords] = useState<{ x: number; y: number }>({ x: 642, y: 384 });
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([
+    {
+      id: 'aud-init-1',
+      timestamp: '00:00:01',
+      actor: 'sovereign-core',
+      domain: 'CORE',
+      operation: 'Initialize tenant-isolated Firecracker VM & mTLS session vault',
+      verdict: 'ALLOW',
+      sha256: '9f84c2a1e7b04d12',
+    },
+  ]);
+
+  // Modals: Foundry Factory (Create Custom Bot) & Deploy AaaS Endpoint
+  const [isFoundryOpen, setIsFoundryOpen] = useState(false);
+  const [isDeployOpen, setIsDeployOpen] = useState(false);
+  const [copiedCurl, setCopiedCurl] = useState(false);
+
+  // Foundry Builder Form State
+  const [newBotHandle, setNewBotHandle] = useState('@fde-custom');
+  const [newBotName, setNewBotName] = useState('Forward-Deployed Supply Chain Agent');
+  const [newBotVertical, setNewBotVertical] = useState('Operations');
+  const [newBotResidency, setNewBotResidency] = useState<SovereignBot['residency']>('ON-PREM-VPC');
+  const [newBotRag, setNewBotRag] = useState('sap-mm-manuals, supplier-contracts-q4');
+  const [newBotMcp, setNewBotMcp] = useState('terminal_exec, postgres_query, slack_webhook');
+
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const terminalEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  useEffect(() => {
+    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [terminalLogs]);
+
+  const appendAudit = (
+    actor: string,
+    domain: ExecutionDomain,
+    operation: string,
+    verdict: AuditEntry['verdict'] = 'ALLOW'
+  ) => {
+    const ts = new Date().toLocaleTimeString();
+    setAuditEntries((prev) => [
+      {
+        id: `aud-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: ts,
+        actor,
+        domain,
+        operation,
+        verdict,
+        sha256: shortHash(`${ts}:${actor}:${operation}`),
+      },
+      ...prev,
+    ]);
+  };
+
+  const handleSelectBot = (bot: SovereignBot) => {
+    setSelectedBot(bot);
+    setActiveTab(bot.defaultTab);
+  };
+
+  // Auto-switch bot if user types @handle at start of prompt
+  const handlePromptChange = (val: string) => {
+    setPrompt(val);
+    const match = val.match(/^(@[a-z0-9-]+)\s+/i);
+    if (match) {
+      const found = bots.find((b) => b.handle.toLowerCase() === match[1].toLowerCase());
+      if (found && found.id !== selectedBot.id) {
+        setSelectedBot(found);
+        setActiveTab(found.defaultTab);
+      }
+    }
+  };
+
+  const handleLaunchPrompt = async (customPrompt?: string) => {
+    const query = (customPrompt ?? prompt).trim();
+    if (!query || isExecuting) return;
+
+    const now = new Date().toLocaleTimeString();
+    setIsWorkspaceActive(true);
+    setActiveTab(selectedBot.defaultTab);
+    setIsExecuting(true);
+    setPrompt('');
+
+    const userMsg: ChatMessage = {
+      id: `u-${Date.now()}`,
+      role: 'user',
+      content: query,
+    };
+
+    const assistantId = `a-${Date.now() + 1}`;
+    const planeDomain: ExecutionDomain =
+      selectedBot.id === 'iq-computer'
+        ? 'DESKTOP'
+        : selectedBot.id === 'web-operator'
+        ? 'BROWSER'
+        : 'TERMINAL';
+
+    const initialSteps: AgentStep[] = [
+      {
+        id: 's1',
+        domain: 'CORE',
+        action: `Sovereign Core routed intent -> ${selectedBot.handle} [${selectedBot.residency}]`,
+        status: 'running',
+        timestamp: now,
+      },
+    ];
+
+    setMessages((prev) => [
+      ...prev,
+      userMsg,
+      {
+        id: assistantId,
+        role: 'assistant',
+        botHandle: selectedBot.handle,
+        content: `Initializing ADK loop, hybrid RAG context (${selectedBot.ragCollections.join(
+          ', '
+        )}), and ${planeDomain} sandbox...`,
+        steps: initialSteps,
+      },
+    ]);
+
+    setTerminalLogs((prev) => [
+      ...prev,
+      `nimbus@sovereign-core:~$ adk dispatch --agent=${selectedBot.handle} --residency="${selectedBot.residency}"`,
+      `[Task] "${query}"`,
+    ]);
+    appendAudit(selectedBot.handle, 'CORE', `Dispatched prompt: "${query.slice(0, 64)}"`);
+
+    // Stage 2: RAG + A2A + Primary Execution Plane
+    setTimeout(() => {
+      setCursorCoords({ x: 418, y: 262 });
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? {
+                ...m,
+                steps: [
+                  { ...initialSteps[0], status: 'done' },
+                  {
+                    id: 's2',
+                    domain: 'RAG',
+                    action: `Retrieved top-k sovereign chunks from [${selectedBot.ragCollections.join(', ')}]`,
+                    status: 'done',
+                    timestamp: new Date().toLocaleTimeString(),
+                  },
+                  {
+                    id: 's3',
+                    domain: planeDomain,
+                    action:
+                      planeDomain === 'DESKTOP'
+                        ? 'CLI-First, GUI-Fallback: Captured X11 frame (1920x1080) & exported ERP table to /workspace/q4.csv'
+                        : planeDomain === 'BROWSER'
+                        ? 'Parsed Accessibility Tree Set-of-Mark IDs [1..14] inside isolated Chromium'
+                        : 'Compiled TypeScript/Python artifacts & started live micro-VM preview on :3000',
+                    status: 'running',
+                    timestamp: new Date().toLocaleTimeString(),
+                  },
+                ],
+              }
+            : m
+        )
+      );
+
+      setTerminalLogs((prev) => [
+        ...prev,
+        `[RAG] Grounded 6 vector chunks (cosine >= 0.89, PII redacted).`,
+        planeDomain === 'DESKTOP'
+          ? `[GUI->CLI] xdotool click (418,262) -> /workspace/q4.csv -> python3 clean_anomalies.py`
+          : planeDomain === 'BROWSER'
+          ? `[CDP] Chromium screencast active -> Accessibility DOM indexed (14 interactive nodes).`
+          : `[SANDBOX] pnpm build && preview ready -> https://preview.nimbusiq.ai`,
+      ]);
+      appendAudit(
+        selectedBot.handle,
+        planeDomain,
+        `Executed primary ${planeDomain} plane action & synced workspace state`
+      );
+    }, 850);
+
+    // Stage 3: MCP + A2A Handshake + Optional HITL Gate on sensitive keywords
+    setTimeout(() => {
+      const requiresHitl = /\b(patch|delete|nginx|jira|submit|production|sync)\b/i.test(query);
+      setCursorCoords({ x: 890, y: 512 });
+
+      if (requiresHitl) {
+        const approvalCmd =
+          selectedBot.id === 'iq-computer'
+            ? 'interop_transfer(/workspace/q4_clean.json -> mcp://jira_create_issue & postgres_prod)'
+            : `${selectedBot.mcpTools[0]}(commit_external_mutation)`;
+
+        setPendingApproval({
+          id: assistantId,
+          command: approvalCmd,
+          domain: 'MCP',
+        });
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: `Paused at **Sovereign HITL Governance Gate**. Review and approve the outbound mutation in the banner or Audit Ledger to finalize execution.`,
+                  steps: [
+                    ...(m.steps ?? []).map((s) => ({ ...s, status: 'done' as const })),
+                    {
+                      id: 's4',
+                      domain: 'MCP',
+                      action: `Awaiting human approval: ${approvalCmd}`,
+                      status: 'awaiting_approval',
+                      timestamp: new Date().toLocaleTimeString(),
+                    },
+                  ],
+                }
+              : m
+          )
+        );
+        appendAudit(selectedBot.handle, 'MCP', `HITL Gate triggered for ${approvalCmd}`, 'HITL_PENDING');
+        setIsExecuting(false);
+        return;
+      }
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? {
+                ...m,
+                content: `Execution complete on **Nimbus Sovereign Core** via **${selectedBot.handle}** (A2A mesh synced with ${selectedBot.a2aPeers.join(
+                  ', '
+                )}). Inspect the live App/Flow canvas, VNC Desktop, Terminal, or Audit Ledger on the right—or click **Deploy AaaS** to publish as a production endpoint.`,
+                steps: [
+                  ...(m.steps ?? []).map((s) => ({ ...s, status: 'done' as const })),
+                  {
+                    id: 's4',
+                    domain: 'ADK/A2A',
+                    action: `Verified output contract with ${selectedBot.a2aPeers[0] ?? '@architect'} & committed SHA-256 ledger`,
+                    status: 'done',
+                    timestamp: new Date().toLocaleTimeString(),
+                  },
+                ],
+              }
+            : m
+        )
+      );
+
+      setTerminalLogs((prev) => [
+        ...prev,
+        `[A2A] Handshake verified with peer ${selectedBot.a2aPeers[0] ?? '@architect'}.`,
+        `[AUDIT] Immutable SHA-256 receipt written. Ready for AaaS publication.`,
+      ]);
+      appendAudit(selectedBot.handle, 'ADK/A2A', 'Completed multi-plane loop & published artifact');
+      setIsExecuting(false);
+    }, 1900);
+  };
+
+  const handleResolveApproval = (approved: boolean) => {
+    if (!pendingApproval) return;
+    const target = pendingApproval;
+    setPendingApproval(null);
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === target.id
+          ? {
+              ...m,
+              content: approved
+                ? `Human-in-the-Loop approval **GRANTED**. Outbound MCP mutation executed and recorded on the Sovereign Audit Ledger.`
+                : `Human-in-the-Loop approval **REJECTED**. Outbound mutation safely aborted; sandbox state rolled back.`,
+              steps: (m.steps ?? []).map((s) =>
+                s.status === 'awaiting_approval'
+                  ? {
+                      ...s,
+                      status: 'done',
+                      action: approved
+                        ? `Approved & executed: ${target.command}`
+                        : `Aborted by operator: ${target.command}`,
+                    }
+                  : s
+              ),
+            }
+          : m
+      )
+    );
+
+    setTerminalLogs((prev) => [
+      ...prev,
+      approved
+        ? `[HITL:APPROVED] Executed ${target.command} -> 200 OK`
+        : `[HITL:DENIED] Rolled back ${target.command}`,
+    ]);
+    appendAudit(
+      'human-operator',
+      target.domain,
+      `${approved ? 'Approved' : 'Rejected'} ${target.command}`,
+      approved ? 'APPROVED' : 'ALLOW'
+    );
+  };
+
+  const handleShellSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cmd = shellInput.trim();
+    if (!cmd) return;
+    setShellInput('');
+
+    let output = `[exec] ${cmd} -> exit code 0`;
+    if (cmd === 'help') {
+      output = 'Available commands: help | whoami | mcp list | a2a peers | rag stats | clear';
+    } else if (cmd === 'whoami') {
+      output = `uid=0(root) Cartridge=${selectedBot.handle} Residency="${selectedBot.residency}" Takeover=${humanTakeover}`;
+    } else if (cmd === 'mcp list') {
+      output = `Bound MCP Tools (${selectedBot.mcpTools.length}): ${selectedBot.mcpTools.join(' | ')}`;
+    } else if (cmd === 'a2a peers') {
+      output = `Active A2A Agent Mesh Peers: ${selectedBot.a2aPeers.join(', ') || 'none'}`;
+    } else if (cmd === 'rag stats') {
+      output = `Indexed Sovereign Collections: ${selectedBot.ragCollections.join(', ')} (HNSW pgvector + reranker)`;
+    } else if (cmd === 'clear') {
+      setTerminalLogs(['nimbus@sovereign-core:~$ clear']);
+      return;
+    }
+
+    setTerminalLogs((prev) => [...prev, `nimbus@sovereign-core:~$ ${cmd}`, output]);
+    appendAudit('fde-shell', 'TERMINAL', `Interactive CLI command: ${cmd}`);
+  };
+
+  const handleCreateCustomBot = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanHandle = newBotHandle.startsWith('@') ? newBotHandle : `@${newBotHandle}`;
+    const created: SovereignBot = {
+      id: `custom-${Date.now()}`,
+      handle: cleanHandle.toLowerCase().replace(/\s+/g, '-'),
+      name: newBotName.trim() || 'Custom Sovereign Cartridge',
+      vertical: newBotVertical.trim() || 'Enterprise',
+      residency: newBotResidency,
+      defaultTab: 'preview',
+      description: `Custom Foundry Cartridge wired with RAG [${newBotRag}] and MCP [${newBotMcp}].`,
+      mcpTools: newBotMcp.split(',').map((s) => s.trim()).filter(Boolean),
+      ragCollections: newBotRag.split(',').map((s) => s.trim()).filter(Boolean),
+      a2aPeers: ['@architect', '@iq-computer'],
+      starterPrompts: [
+        `Run ${cleanHandle} diagnostic across ${newBotRag.split(',')[0] || 'enterprise RAG'} and sync via MCP`,
+        `Deploy ${cleanHandle} as a multi-tenant AaaS REST endpoint with RBAC`,
+      ],
+    };
+
+    setBots((prev) => [...prev, created]);
+    setSelectedBot(created);
+    setIsFoundryOpen(false);
+    appendAudit('foundry-factory', 'ADK/A2A', `Published custom cartridge ${created.handle}`);
+  };
+
+  const aaasCurlSnippet = `curl -X POST https://api.nimbusiq.ai/v1/aaas/${selectedBot.id}/invoke \\
+  -H "Authorization: Bearer $NIMBUS_SOVEREIGN_KEY" \\
+  -H "X-Nimbus-Residency: ${selectedBot.residency}" \\
+  -d '{"prompt": "Run autonomous cross-domain workflow", "stream": true}'`;
+
+  return (
+    <div className="min-h-screen bg-[#06080D] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+      {/* TOP SOVEREIGN NAVIGATION BAR */}
+      <header className="h-14 border-b border-slate-800/80 bg-[#090C14]/90 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsWorkspaceActive(false)}
+            className="flex items-center gap-2.5 text-left group cursor-pointer"
+          >
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 via-sky-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+              <Cpu className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+            </div>
+            <div>
+              <span className="font-semibold tracking-tight text-white text-sm block leading-none">
+                Nimbus iQ AI
+              </span>
+              <span className="text-[10px] font-mono text-cyan-400 tracking-wider uppercase">
+                Sovereign Core · ADK · AaaS
+              </span>
+            </div>
+          </button>
+
+          {isWorkspaceActive && (
+            <div className="hidden lg:flex items-center gap-2 ml-3 pl-3 border-l border-slate-800">
+              <span className="px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-mono">
+                {selectedBot.handle}
+              </span>
+              <span className="text-xs text-slate-400">{selectedBot.vertical}</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
+                {selectedBot.residency}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-[11px] font-mono">
+            <Lock className="w-3 h-3" />
+            <span>ZERO-TRUST mTLS</span>
+          </div>
+
+          <button
+            onClick={() => setIsFoundryOpen(true)}
+            className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-xs font-medium text-cyan-300 flex items-center gap-1.5 transition cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Foundry Factory</span>
+          </button>
+
+          <button
+            onClick={() => setIsDeployOpen(true)}
+            className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-xs font-medium text-cyan-200 flex items-center gap-1.5 transition cursor-pointer"
+          >
+            <Rocket className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Deploy AaaS</span>
+          </button>
+
+          <button
+            onClick={() => setIsWorkspaceActive(!isWorkspaceActive)}
+            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-100 transition cursor-pointer"
+          >
+            {isWorkspaceActive ? 'Frontpage' : 'Open Studio'}
+          </button>
+        </div>
+      </header>
+
+      {/* HUMAN-IN-THE-LOOP (HITL) GLOBAL GOVERNANCE BANNER */}
+      {pendingApproval && (
+        <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 z-30">
+          <div className="flex items-center gap-2.5 text-xs text-amber-200">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="font-semibold uppercase tracking-wider font-mono text-[11px] text-amber-300">
+              Sovereign HITL Approval Required:
+            </span>
+            <code className="px-2 py-0.5 rounded bg-slate-950/80 border border-amber-500/30 text-amber-200 font-mono text-[11px]">
+              {pendingApproval.command}
+            </code>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleResolveApproval(false)}
+              className="px-3 py-1 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-slate-300 cursor-pointer"
+            >
+              Reject & Rollback
+            </button>
+            <button
+              onClick={() => handleResolveApproval(true)}
+              className="px-3 py-1 rounded-md bg-amber-400 hover:bg-amber-300 text-slate-950 font-semibold text-xs cursor-pointer"
+            >
+              Approve Execution
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* VIEW 1: DEVELOPER FRONTPAGE & AGENTIC FOUNDRY LANDING                 */}
+      {/* ===================================================================== */}
+      {!isWorkspaceActive ? (
+        <main className="flex-1 relative overflow-hidden">
+          {/* Ambient Sovereign Glow */}
+          <div className="pointer-events-none absolute inset-0 flex justify-center">
+            <div className="w-[780px] h-[380px] bg-cyan-500/10 blur-[130px] rounded-full -top-24 relative" />
+          </div>
+
+          <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16 pb-20">
+            {/* Hero Badge */}
+            <div className="flex justify-center mb-5">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-xs text-cyan-300 font-mono">
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                <span>One Sovereign Core. Infinite Enterprise Verticals.</span>
+              </div>
+            </div>
+
+            {/* Hero Headline */}
+            <h1 className="text-center text-3xl sm:text-5xl lg:text-[54px] font-bold tracking-tight text-white leading-[1.1] mb-4">
+              Agentic App Designer,{' '}
+              <span className="bg-gradient-to-r from-cyan-300 via-sky-400 to-blue-500 bg-clip-text text-transparent">
+                Computer OS Runtime & AaaS Foundry
+              </span>
+            </h1>
+
+            <p className="text-center text-slate-400 text-sm sm:text-base max-w-3xl mx-auto mb-8 leading-relaxed">
+              Design, orchestrate, and ship sovereign enterprise agents powered by{' '}
+              <span className="text-slate-200 font-medium">ADK</span>,{' '}
+              <span className="text-slate-200 font-medium">A2A multi-agent mesh</span>,{' '}
+              <span className="text-slate-200 font-medium">MCP connectors</span>,{' '}
+              <span className="text-slate-200 font-medium">Hybrid RAG</span>, and{' '}
+              <span className="text-slate-200 font-medium">@iq-computer</span> virtual desktops—backed by
+              Forward-Deployed Engineering pods and one-click Agent-as-a-Service APIs.
+            </p>
+
+            {/* Grok-Style Sovereign Bot Cartridge Pills */}
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-5">
+              {bots.map((bot) => {
+                const active = selectedBot.id === bot.id;
+                return (
+                  <button
+                    key={bot.id}
+                    onClick={() => handleSelectBot(bot)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition flex items-center gap-1.5 border cursor-pointer ${
+                      active
+                        ? 'bg-cyan-500/15 border-cyan-400 text-cyan-200 shadow-sm shadow-cyan-500/20'
+                        : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                    }`}
+                  >
+                    <span className="font-mono font-semibold">{bot.handle}</span>
+                    <span className="text-slate-500">·</span>
+                    <span>{bot.vertical}</span>
+                  </button>
+                );
+              })}
+
+              <button
+                onClick={() => setIsFoundryOpen(true)}
+                className="px-3 py-1.5 rounded-full text-xs font-mono border border-dashed border-slate-700 text-slate-400 hover:text-cyan-300 hover:border-cyan-500/50 transition flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>New Cartridge</span>
+              </button>
+            </div>
+
+            {/* CENTRAL COMMAND OMNIBOX */}
+            <div className="max-w-3xl mx-auto rounded-2xl bg-[#0B0F19]/95 border border-slate-800 focus-within:border-cyan-500/60 shadow-2xl shadow-black/60 p-3.5 transition">
+              <textarea
+                rows={3}
+                value={prompt}
+                onChange={(e) => handlePromptChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleLaunchPrompt();
+                  }
+                }}
+                placeholder={`Ask ${selectedBot.handle} (or type @iq-computer, @architect, @web-operator) to design an app, operate a legacy desktop GUI, run bash ETL, or deploy an AaaS agent...`}
+                className="w-full bg-transparent text-slate-100 placeholder-slate-500 text-sm sm:text-base resize-none focus:outline-none px-2 py-1"
+              />
+
+              {/* Omnibox Context & Telemetry Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 mt-2 border-t border-slate-800/80 px-1">
+                <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                  <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 font-mono text-cyan-300">
+                    {selectedBot.residency}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 font-mono text-slate-400">
+                    MCP: {selectedBot.mcpTools.length}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 font-mono text-slate-400">
+                    RAG: {selectedBot.ragCollections[0]}
+                  </span>
+                  <span className="hidden sm:inline text-slate-500 truncate max-w-xs">
+                    {selectedBot.description}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => handleLaunchPrompt()}
+                  disabled={!prompt.trim()}
+                  className="px-4 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <span>Run Sovereign Agent</span>
+                  <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                </button>
+              </div>
+            </div>
+
+            {/* Starter Vertical Prompts */}
+            <div className="max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+              {selectedBot.starterPrompts.map((starter, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleLaunchPrompt(starter)}
+                  className="p-3.5 rounded-xl bg-slate-900/50 hover:bg-slate-900 border border-slate-800/80 hover:border-cyan-500/40 transition group flex items-start justify-between gap-3 text-left cursor-pointer"
+                >
+                  <span className="text-xs text-slate-300 group-hover:text-white leading-relaxed">
+                    {starter}
+                  </span>
+                  <Play className="w-3.5 h-3.5 text-slate-600 group-hover:text-cyan-400 shrink-0 mt-0.5 transition" />
+                </button>
+              ))}
+            </div>
+
+            {/* FOUR EXECUTION PLANES STRIP */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mt-12">
+              <div className="p-4 rounded-xl bg-[#0A0E17] border border-slate-800/80">
+                <div className="flex items-center gap-2 text-cyan-400 mb-1.5">
+                  <Code2 className="w-4 h-4" />
+                  <span className="text-xs font-semibold text-white">Code & App Sandbox</span>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Ephemeral Firecracker micro-VMs compiling Next.js, FastAPI, and ADK agent graphs with live preview.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#0A0E17] border border-slate-800/80">
+                <div className="flex items-center gap-2 text-cyan-400 mb-1.5">
+                  <Monitor className="w-4 h-4" />
+                  <span className="text-xs font-semibold text-white">@iq-computer OS Plane</span>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  1920×1080 X11/Wayland VNC desktop + root bash CLI-first fallback for SAP, Excel & thick clients.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#0A0E17] border border-slate-800/80">
+                <div className="flex items-center gap-2 text-cyan-400 mb-1.5">
+                  <Globe className="w-4 h-4" />
+                  <span className="text-xs font-semibold text-white">Headless Browser Plane</span>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Isolated Chromium + CDP Set-of-Mark DOM vision with 1Password/Vault session persistence & HITL gates.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#0A0E17] border border-slate-800/80">
+                <div className="flex items-center gap-2 text-cyan-400 mb-1.5">
+                  <Workflow className="w-4 h-4" />
+                  <span className="text-xs font-semibold text-white">ADK · A2A · MCP · RAG Bus</span>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  3,500+ governed MCP connectors, sovereign vector vaults, and peer-to-peer A2A agent handshakes.
+                </p>
+              </div>
+            </div>
+
+            {/* AGENTIC FOUNDRY FACTORY + FDE + SAAS AaaS DEVELOPER ARCHITECTURE */}
+            <div className="mt-10 pt-10 border-t border-slate-800/70 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-5 rounded-2xl bg-gradient-to-b from-slate-900/70 to-[#080B12] border border-slate-800">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-cyan-400">
+                    01 · Agentic Foundry Factory
+                  </span>
+                  <Boxes className="w-4 h-4 text-cyan-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-white mb-1.5">
+                  Declarative ADK + RAG + MCP Cartridges
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed mb-3">
+                  Package domain prompts, hybrid pgvector RAG pipelines, tool allowlists, and EU/US/Air-Gapped
+                  residency policies into reusable enterprise blueprints in minutes.
+                </p>
+                <button
+                  onClick={() => setIsFoundryOpen(true)}
+                  className="text-xs font-mono text-cyan-300 hover:text-cyan-200 cursor-pointer"
+                >
+                  Launch Cartridge Builder →
+                </button>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-gradient-to-b from-slate-900/70 to-[#080B12] border border-slate-800">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-emerald-400">
+                    02 · Forward-Deployed Engineer (FDE)
+                  </span>
+                  <Sliders className="w-4 h-4 text-emerald-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-white mb-1.5">
+                  Co-Pilot Takeover & On-Prem mTLS Relay
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed mb-3">
+                  Embed FDE pods directly into your VPC via the Go/Rust Sovereign Daemon. Step into live VNC/xterm
+                  sessions, approve risky mutations, and codify edge-case runbooks.
+                </p>
+                <button
+                  onClick={() => {
+                    handleSelectBot(bots[1]);
+                    setIsWorkspaceActive(true);
+                  }}
+                  className="text-xs font-mono text-emerald-300 hover:text-emerald-200 cursor-pointer"
+                >
+                  Open FDE Desktop Studio →
+                </button>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-gradient-to-b from-slate-900/70 to-[#080B12] border border-slate-800">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-sky-400">
+                    03 · SaaS Agent-as-a-Service (AaaS)
+                  </span>
+                  <Key className="w-4 h-4 text-sky-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-white mb-1.5">
+                  Multi-Tenant API, A2A Protocol & Billing
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed mb-3">
+                  Expose any Nimbus Cartridge as a metered REST/SSE or A2A JSON-RPC endpoint with per-tenant RBAC,
+                  PII redaction, and cryptographic SHA-256 audit receipts.
+                </p>
+                <button
+                  onClick={() => setIsDeployOpen(true)}
+                  className="text-xs font-mono text-sky-300 hover:text-sky-200 cursor-pointer"
+                >
+                  Inspect AaaS Endpoint SDK →
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+      ) : (
+        /* ===================================================================== */
+        /* VIEW 2: SPLIT-SCREEN SOVEREIGN WORKSPACE                              */
+        /* ===================================================================== */
+        <div className="flex-1 flex flex-col lg:flex-row h-[calc(100vh-3.5rem)] overflow-hidden">
+          {/* LEFT PANE (36%): Agent Reasoning Stream & Command Input */}
+          <aside className="w-full lg:w-[36%] border-b lg:border-b-0 lg:border-r border-slate-800/80 bg-[#080B12] flex flex-col h-[46vh] lg:h-full">
+            {/* Bot Selector Strip */}
+            <div className="px-3 py-2 border-b border-slate-800/80 flex items-center gap-1.5 overflow-x-auto">
+              {bots.map((bot) => (
+                <button
+                  key={bot.id}
+                  onClick={() => handleSelectBot(bot)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-mono shrink-0 transition cursor-pointer ${
+                    selectedBot.id === bot.id
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                      : 'text-slate-400 hover:bg-slate-800/80 border border-transparent'
+                  }`}
+                >
+                  {bot.handle}
+                </button>
+              ))}
+            </div>
+
+            {/* Streaming Reasoning & Tool Thread */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {messages.length === 0 && (
+                <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800/80 text-xs text-slate-400 space-y-2">
+                  <div className="font-mono text-cyan-300">{selectedBot.handle} Ready</div>
+                  <p>{selectedBot.description}</p>
+                  <div className="pt-1 flex flex-wrap gap-1.5">
+                    {selectedBot.starterPrompts.map((sp, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleLaunchPrompt(sp)}
+                        className="text-left px-2.5 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-900 border border-slate-800 text-[11px] text-slate-300 transition cursor-pointer"
+                      >
+                        → {sp}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
+                >
+                  {msg.role === 'user' ? (
+                    <div className="max-w-[88%] px-3.5 py-2.5 rounded-2xl rounded-br-sm bg-cyan-500/15 border border-cyan-500/30 text-xs text-slate-100 leading-relaxed">
+                      {msg.content}
+                    </div>
+                  ) : (
+                    <div className="w-full p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800/90 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-mono font-semibold text-cyan-300">
+                          {msg.botHandle}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-500">
+                          {selectedBot.residency}
+                        </span>
+                      </div>
+
+                      {msg.steps && (
+                        <div className="space-y-1.5 py-1">
+                          {msg.steps.map((step) => (
+                            <div
+                              key={step.id}
+                              className="flex items-start gap-2 text-[11px] bg-slate-950/70 border border-slate-800/80 rounded-lg px-2.5 py-1.5"
+                            >
+                              {step.status === 'running' ? (
+                                <Loader2 className="w-3.5 h-3.5 text-cyan-400 animate-spin shrink-0 mt-0.5" />
+                              ) : step.status === 'awaiting_approval' ? (
+                                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                              ) : (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                              )}
+                              <span className="px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800 font-mono text-[10px] text-cyan-300 shrink-0">
+                                {step.domain}
+                              </span>
+                              <span className="text-slate-300 leading-snug">{step.action}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <p className="text-xs text-slate-300 leading-relaxed">{msg.content}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Bottom Studio Prompt Input */}
+            <div className="p-3 border-t border-slate-800/80 bg-[#090C14]">
+              <div className="flex items-center gap-2 rounded-xl bg-slate-900/90 border border-slate-800 focus-within:border-cyan-500/50 px-3 py-2">
+                <input
+                  type="text"
+                  value={prompt}
+                  onChange={(e) => handlePromptChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleLaunchPrompt();
+                  }}
+                  placeholder={`Instruct ${selectedBot.handle} or @peer...`}
+                  className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none"
+                />
+                <button
+                  onClick={() => handleLaunchPrompt()}
+                  disabled={isExecuting || !prompt.trim()}
+                  className="p-1.5 rounded-lg bg-cyan-400 hover:bg-cyan-300 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 transition cursor-pointer"
+                >
+                  <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                </button>
+              </div>
+            </div>
+          </aside>
+
+          {/* RIGHT PANE (64%): Multi-Plane Sovereign Viewport */}
+          <section className="flex-1 flex flex-col bg-[#06080D] h-[54vh] lg:h-full overflow-hidden">
+            {/* Viewport Switcher Tabs + Human Takeover Toggle */}
+            <div className="px-4 py-2 border-b border-slate-800/80 bg-[#090C14] flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1 overflow-x-auto">
+                {(
+                  [
+                    { id: 'preview', label: 'Live App & Flow', icon: Layers },
+                    { id: 'browser', label: 'Browser Agent', icon: Globe },
+                    { id: 'desktop', label: 'Computer VNC', icon: Monitor },
+                    { id: 'terminal', label: 'Terminal', icon: Terminal },
+                    { id: 'audit', label: 'Audit Ledger', icon: ShieldCheck },
+                  ] as const
+                ).map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
+                        isActive
+                          ? 'bg-slate-800 text-white border border-slate-700'
+                          : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => {
+                  const next = !humanTakeover;
+                  setHumanTakeover(next);
+                  appendAudit(
+                    'human-operator',
+                    activeTab === 'desktop' ? 'DESKTOP' : 'BROWSER',
+                    next ? 'Enabled Human Takeover (Interactive Control)' : 'Returned Control to Agent'
+                  );
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-mono flex items-center gap-1.5 border transition cursor-pointer ${
+                  humanTakeover
+                    ? 'bg-amber-500/20 border-amber-400 text-amber-200'
+                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Hand className="w-3.5 h-3.5" />
+                <span>{humanTakeover ? 'Human In Control' : 'Take Control'}</span>
+              </button>
+            </div>
+
+            {/* ACTIVE TAB BODY */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {/* TAB 1: LIVE APP PREVIEW, ADK CODE & A2A/MCP FLOW CANVAS */}
+              {activeTab === 'preview' && (
+                <div className="h-full flex flex-col gap-4">
+                  <div className="flex items-center justify-between bg-slate-900/70 border border-slate-800 rounded-xl px-3.5 py-2">
+                    <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>https://sandbox-{selectedBot.id}.nimbusiq.ai</span>
+                    </div>
+                    <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                      {(['app', 'flow', 'code'] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          onClick={() => setPreviewSubMode(mode)}
+                          className={`px-2.5 py-1 rounded text-[11px] font-mono uppercase cursor-pointer ${
+                            previewSubMode === mode
+                              ? 'bg-cyan-500/20 text-cyan-300'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {mode === 'app' ? 'Live App' : mode === 'flow' ? 'A2A + MCP Graph' : 'ADK Code'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {previewSubMode === 'app' && (
+                    <div className="flex-1 rounded-2xl bg-[#0B0F19] border border-slate-800 p-5 space-y-5">
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                        <div>
+                          <span className="text-[10px] font-mono uppercase text-cyan-400">
+                            Generated Sovereign Enterprise App
+                          </span>
+                          <h3 className="text-base font-semibold text-white">
+                            SOC2 & Cross-Domain Agent Telemetry Control Plane
+                          </h3>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono">
+                          99.98% Policy Pass
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800">
+                          <div className="text-[11px] text-slate-400">Active AaaS Invocations</div>
+                          <div className="text-2xl font-bold text-white mt-1">48,920</div>
+                          <div className="text-[11px] text-emerald-400 font-mono mt-1">+18.4% vs last 24h</div>
+                        </div>
+                        <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800">
+                          <div className="text-[11px] text-slate-400">Hybrid RAG Grounding</div>
+                          <div className="text-2xl font-bold text-cyan-300 mt-1">0.94 cos</div>
+                          <div className="text-[11px] text-slate-400 font-mono mt-1">Zero PII leakage</div>
+                        </div>
+                        <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800">
+                          <div className="text-[11px] text-slate-400">MCP + Computer Hops</div>
+                          <div className="text-2xl font-bold text-white mt-1">1,204</div>
+                          <div className="text-[11px] text-cyan-400 font-mono mt-1">SHA-256 notarized</div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl bg-slate-950/90 border border-slate-800 p-4">
+                        <div className="text-xs font-mono text-slate-400 mb-3">
+                          Live Cross-Domain Execution Stream ({selectedBot.handle})
+                        </div>
+                        <div className="space-y-2 text-xs font-mono">
+                          <div className="flex justify-between py-1.5 border-b border-slate-900">
+                            <span className="text-cyan-300">[ADK] Intent Router</span>
+                            <span className="text-slate-400">{selectedBot.handle} · {selectedBot.residency}</span>
+                            <span className="text-emerald-400">VERIFIED</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 border-b border-slate-900">
+                            <span className="text-sky-300">[RAG] Vector Vault</span>
+                            <span className="text-slate-400">{selectedBot.ragCollections.join(', ')}</span>
+                            <span className="text-emerald-400">GROUNDED</span>
+                          </div>
+                          <div className="flex justify-between py-1.5">
+                            <span className="text-purple-300">[MCP] Enterprise Bus</span>
+                            <span className="text-slate-400">{selectedBot.mcpTools.slice(0, 3).join(', ')}</span>
+                            <span className="text-emerald-400">CONNECTED</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {previewSubMode === 'flow' && (
+                    <div className="flex-1 rounded-2xl bg-[#0B0F19] border border-slate-800 p-6 flex flex-col justify-center">
+                      <div className="text-xs font-mono text-cyan-400 uppercase mb-4">
+                        Cross-Domain Interoperability Topology (ADK · RAG · Computer · A2A · MCP)
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-center">
+                        <div className="p-4 rounded-xl bg-slate-950 border border-cyan-500/40">
+                          <div className="flex items-center gap-2 text-cyan-300 text-xs font-mono mb-1">
+                            <Bot className="w-4 h-4" />
+                            <span>1. {selectedBot.handle}</span>
+                          </div>
+                          <p className="text-[11px] text-slate-400">
+                            ADK planner enforces {selectedBot.residency} & PII guardrails.
+                          </p>
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+                          <div className="flex items-center gap-2 text-emerald-300 text-xs font-mono mb-1">
+                            <Database className="w-4 h-4" />
+                            <span>2. Sovereign RAG</span>
+                          </div>
+                          <p className="text-[11px] text-slate-400">
+                            Collections: {selectedBot.ragCollections.join(', ')}
+                          </p>
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+                          <div className="flex items-center gap-2 text-amber-300 text-xs font-mono mb-1">
+                            <Monitor className="w-4 h-4" />
+                            <span>3. CLI / GUI / Browser</span>
+                          </div>
+                          <p className="text-[11px] text-slate-400">
+                            CLI-first bash ETL with X11 VNC & Chromium fallback.
+                          </p>
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-slate-950 border border-purple-500/40">
+                          <div className="flex items-center gap-2 text-purple-300 text-xs font-mono mb-1">
+                            <Network className="w-4 h-4" />
+                            <span>4. MCP & A2A Peers</span>
+                          </div>
+                          <p className="text-[11px] text-slate-400">
+                            Syncs to {selectedBot.mcpTools[0]} & peers ({selectedBot.a2aPeers.join(', ')}).
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {previewSubMode === 'code' && (
+                    <pre className="flex-1 rounded-2xl bg-[#05070B] border border-slate-800 p-4 text-xs font-mono text-slate-300 overflow-auto leading-relaxed">
+{`// Generated by Nimbus Sovereign Core (${selectedBot.handle})
+import { createSovereignComputerTools } from '@nimbus/computer-sdk';
+import { createMcpBridge } from '@nimbus/mcp-connectors';
+
+export const cartridgeConfig = {
+  handle: '${selectedBot.handle}',
+  residency: '${selectedBot.residency}',
+  ragVaults: ${JSON.stringify(selectedBot.ragCollections)},
+  a2aMeshPeers: ${JSON.stringify(selectedBot.a2aPeers)},
+  tools: {
+    ...createSovereignComputerTools('vm-sovereign-01'),
+    ...createMcpBridge(${JSON.stringify(selectedBot.mcpTools)}),
+  },
+};`}
+                    </pre>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: HEADLESS BROWSER AGENT (@web-operator) */}
+              {activeTab === 'browser' && (
+                <div className="h-full rounded-2xl bg-[#0B0F19] border border-slate-800 flex flex-col overflow-hidden">
+                  <div className="px-3.5 py-2.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1 text-xs font-mono text-slate-300">
+                      <Lock className="w-3 h-3 text-emerald-400" />
+                      <span>https://supplier-portal.enterprise.internal/compliance/q4</span>
+                    </div>
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+                      Set-of-Mark DOM Active
+                    </span>
+                  </div>
+
+                  <div className="flex-1 p-6 relative bg-gradient-to-br from-[#0D1322] to-[#070A12]">
+                    <div className="max-w-xl mx-auto rounded-xl bg-slate-900/90 border border-slate-800 p-5 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-semibold text-white">
+                          Vendor Compliance Portal · Expiring Certificates
+                        </h4>
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400 text-[10px] font-mono text-amber-300">
+                          [1] Filter: Q4 Expiring
+                        </span>
+                      </div>
+
+                      <div className="space-y-2 text-xs">
+                        <div className="p-2.5 rounded-lg bg-slate-950 border border-cyan-500/40 flex justify-between items-center">
+                          <span>Apex Precision Logistics — ISO 27001</span>
+                          <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono text-[10px]">
+                            [2] Extract Row
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex justify-between items-center">
+                          <span>Nordic Cloud Hosting — SOC2 Type II</span>
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[10px]">
+                            [3] Verified Valid
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex justify-end">
+                        <button
+                          onClick={() =>
+                            appendAudit('@web-operator', 'BROWSER', 'Extracted structured table [1..3] via CDP')
+                          }
+                          className="px-3 py-1.5 rounded-lg bg-cyan-500/20 border border-cyan-400 text-xs font-mono text-cyan-200 cursor-pointer"
+                        >
+                          [4] Submit Audit Sync (HITL Guarded)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: COMPUTER VNC DESKTOP (@iq-computer) */}
+              {activeTab === 'desktop' && (
+                <div
+                  onClick={(e) => {
+                    if (!humanTakeover) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = Math.round(((e.clientX - rect.left) / rect.width) * 1920);
+                    const y = Math.round(((e.clientY - rect.top) / rect.height) * 1080);
+                    setCursorCoords({ x, y });
+                    appendAudit('human-operator', 'DESKTOP', `Interactive VNC left_click(${x}, ${y})`);
+                  }}
+                  className={`h-full rounded-2xl border ${
+                    humanTakeover ? 'border-amber-400 cursor-crosshair' : 'border-slate-800'
+                  } bg-[#0A101D] flex flex-col overflow-hidden select-none`}
+                >
+                  {/* VNC Top System Bar */}
+                  <div className="px-3.5 py-2 bg-slate-950 border-b border-slate-800 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                    <span>@iq-computer · Ubuntu 24.04 X11 (1920×1080 · noVNC WebRTC)</span>
+                    <span className="text-cyan-300">
+                      Cursor: ({cursorCoords.x}, {cursorCoords.y}){' '}
+                      {humanTakeover ? '· HUMAN CONTROL' : '· AUTONOMOUS'}
+                    </span>
+                  </div>
+
+                  {/* Simulated Virtual OS Desktop Windows */}
+                  <div className="flex-1 p-5 grid grid-cols-1 md:grid-cols-2 gap-4 relative bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px]">
+                    {/* Window 1: Legacy Desktop ERP */}
+                    <div className="rounded-xl bg-slate-900/95 border border-slate-700 shadow-2xl overflow-hidden flex flex-col">
+                      <div className="px-3 py-1.5 bg-slate-800 text-[11px] font-mono text-slate-200 flex justify-between">
+                        <span>LegacyERP Thick Client v4.2 (X11 GUI)</span>
+                        <span className="text-emerald-400">PID 2180</span>
+                      </div>
+                      <div className="p-3.5 text-xs space-y-2.5 flex-1">
+                        <div className="text-slate-400">Module: General Ledger Export (No REST API)</div>
+                        <div className="p-2 rounded bg-slate-950 font-mono text-[11px] text-slate-300">
+                          Batch #Q4-8821 | 14,290 rows | 3 reconciliation anomalies
+                        </div>
+                        <div className="inline-block px-2.5 py-1 rounded bg-cyan-500/20 border border-cyan-400 text-[11px] font-mono text-cyan-200">
+                          Exported → /workspace/q4.csv
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Window 2: Cross-Domain Bridge Monitor */}
+                    <div className="rounded-xl bg-[#05070C]/95 border border-slate-800 shadow-2xl overflow-hidden flex flex-col">
+                      <div className="px-3 py-1.5 bg-slate-900 text-[11px] font-mono text-cyan-300 flex justify-between">
+                        <span>CLI-First ETL Bridge (/workspace)</span>
+                        <span>bash + python3</span>
+                      </div>
+                      <div className="p-3.5 font-mono text-[11px] text-emerald-300 space-y-1.5 flex-1">
+                        <div>$ python3 clean_anomalies.py /workspace/q4.csv</div>
+                        <div className="text-slate-400">→ Isolated 3 variance rows (delta &gt; $25,000)</div>
+                        <div>$ interop_transfer --to mcp://jira_create_issue</div>
+                        <div className="text-cyan-300">→ Synced to Sovereign Vault & Jira FIN-409</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: INTERACTIVE SOVEREIGN TERMINAL */}
+              {activeTab === 'terminal' && (
+                <div className="h-full rounded-2xl bg-[#04060A] border border-slate-800 flex flex-col font-mono text-xs overflow-hidden">
+                  <div className="px-4 py-2 bg-slate-950 border-b border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+                    <span>root@nimbus-sovereign-vm:/workspace (mTLS session)</span>
+                    <button
+                      onClick={() => setTerminalLogs(['nimbus@sovereign-core:~$ session reset.'])}
+                      className="flex items-center gap-1 hover:text-white cursor-pointer"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Clear</span>
+                    </button>
+                  </div>
+
+                  <div className="flex-1 p-4 overflow-y-auto space-y-1.5 text-slate-300">
+                    {terminalLogs.map((line, idx) => (
+                      <div
+                        key={idx}
+                        className={
+                          line.startsWith('nimbus@')
+                            ? 'text-cyan-300'
+                            : line.startsWith('[OK]') || line.startsWith('[HITL:APPROVED]')
+                            ? 'text-emerald-400'
+                            : 'text-slate-300'
+                        }
+                      >
+                        {line}
+                      </div>
+                    ))}
+                    <div ref={terminalEndRef} />
+                  </div>
+
+                  <form
+                    onSubmit={handleShellSubmit}
+                    className="px-4 py-2.5 bg-slate-950 border-t border-slate-800 flex items-center gap-2"
+                  >
+                    <span className="text-cyan-400 shrink-0">nimbus@sovereign-core:~$</span>
+                    <input
+                      type="text"
+                      value={shellInput}
+                      onChange={(e) => setShellInput(e.target.value)}
+                      placeholder="Type co-pilot command (try: help, mcp list, a2a peers, rag stats, whoami)..."
+                      className="flex-1 bg-transparent text-white placeholder-slate-600 focus:outline-none"
+                    />
+                  </form>
+                </div>
+              )}
+
+              {/* TAB 5: CRYPTOGRAPHIC SOVEREIGN AUDIT LEDGER */}
+              {activeTab === 'audit' && (
+                <div className="h-full rounded-2xl bg-[#0B0F19] border border-slate-800 overflow-hidden flex flex-col">
+                  <div className="px-4 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-semibold text-white">
+                        Immutable Sovereign Compliance & Audit Ledger
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        Every shell command, VNC coordinate, browser hop, RAG query, and MCP call is hash-chained.
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-mono text-emerald-300">
+                      SOC2 / HIPAA / ISO-42001
+                    </span>
+                  </div>
+
+                  <div className="flex-1 overflow-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-[10px] font-mono uppercase text-slate-400 bg-slate-950/50">
+                          <th className="py-2.5 px-3">Time</th>
+                          <th className="py-2.5 px-3">Actor</th>
+                          <th className="py-2.5 px-3">Plane</th>
+                          <th className="py-2.5 px-3">Operation</th>
+                          <th className="py-2.5 px-3">Verdict</th>
+                          <th className="py-2.5 px-3">SHA-256</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                        {auditEntries.map((row) => (
+                          <tr key={row.id} className="hover:bg-slate-900/40">
+                            <td className="py-2 px-3 text-slate-400 whitespace-nowrap">{row.timestamp}</td>
+                            <td className="py-2 px-3 text-cyan-300 whitespace-nowrap">{row.actor}</td>
+                            <td className="py-2 px-3">
+                              <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
+                                {row.domain}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-slate-200 font-sans text-xs">{row.operation}</td>
+                            <td className="py-2 px-3">
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[10px] ${
+                                  row.verdict === 'HITL_PENDING'
+                                    ? 'bg-amber-500/20 text-amber-300'
+                                    : 'bg-emerald-500/15 text-emerald-300'
+                                }`}
+                              >
+                                {row.verdict}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-slate-500">{row.sha256}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL 1: AGENTIC FOUNDRY FACTORY (CREATE CUSTOM CARTRIDGE)            */}
+      {/* ===================================================================== */}
+      {isFoundryOpen && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <form
+            onSubmit={handleCreateCustomBot}
+            className="w-full max-w-lg rounded-2xl bg-[#0B0F19] border border-slate-800 p-6 space-y-4 shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <span className="text-[10px] font-mono uppercase text-cyan-400">
+                  Nimbus Agentic Foundry Factory
+                </span>
+                <h3 className="text-base font-semibold text-white">
+                  Build Custom Sovereign Bot Cartridge
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFoundryOpen(false)}
+                className="text-xs text-slate-400 hover:text-white cursor-pointer"
+              >
+                ESC
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div>
+                <label className="block text-slate-400 mb-1">Bot Handle</label>
+                <input
+                  value={newBotHandle}
+                  onChange={(e) => setNewBotHandle(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-400 mb-1">Enterprise Vertical</label>
+                <input
+                  value={newBotVertical}
+                  onChange={(e) => setNewBotVertical(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white"
+                />
+              </div>
+            </div>
+
+            <div className="text-xs">
+              <label className="block text-slate-400 mb-1">Cartridge Name</label>
+              <input
+                value={newBotName}
+                onChange={(e) => setNewBotName(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white"
+              />
+            </div>
+
+            <div className="text-xs">
+              <label className="block text-slate-400 mb-1">Sovereign Data Residency Policy</label>
+              <select
+                value={newBotResidency}
+                onChange={(e) => setNewBotResidency(e.target.value as SovereignBot['residency'])}
+                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono"
+              >
+                <option value="ON-PREM-VPC">ON-PREM-VPC (mTLS Daemon)</option>
+                <option value="US-EAST VPC">US-EAST VPC</option>
+                <option value="EU-CENTRAL">EU-CENTRAL (GDPR Strict)</option>
+                <option value="SOVEREIGN VM">SOVEREIGN VM (@iq-computer)</option>
+                <option value="AIR-GAPPED">AIR-GAPPED</option>
+              </select>
+            </div>
+
+            <div className="text-xs">
+              <label className="block text-slate-400 mb-1">Sovereign RAG Vector Collections (comma-separated)</label>
+              <input
+                value={newBotRag}
+                onChange={(e) => setNewBotRag(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono"
+              />
+            </div>
+
+            <div className="text-xs">
+              <label className="block text-slate-400 mb-1">Allowed MCP & Computer Tools (comma-separated)</label>
+              <input
+                value={newBotMcp}
+                onChange={(e) => setNewBotMcp(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsFoundryOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-semibold text-xs cursor-pointer"
+              >
+                Publish Cartridge to Studio
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL 2: SAAS AGENT-AS-A-SERVICE (AaaS) ENDPOINT DEPLOYMENT           */}
+      {/* ===================================================================== */}
+      {isDeployOpen && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-xl rounded-2xl bg-[#0B0F19] border border-slate-800 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <span className="text-[10px] font-mono uppercase text-cyan-400">
+                  Agent-as-a-Service (AaaS) Control Plane
+                </span>
+                <h3 className="text-base font-semibold text-white">
+                  Production Endpoint · {selectedBot.handle}
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsDeployOpen(false)}
+                className="text-xs text-slate-400 hover:text-white cursor-pointer"
+              >
+                ESC
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Invoke <span className="text-cyan-300 font-mono">{selectedBot.handle}</span> from any SaaS backend,
+              CI/CD pipeline, or peer A2A agent with enforced{' '}
+              <span className="text-white font-mono">{selectedBot.residency}</span> isolation:
+            </p>
+
+            <div className="relative">
+              <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-cyan-200 overflow-x-auto leading-relaxed">
+                {aaasCurlSnippet}
+              </pre>
+              <button
+                onClick={() => {
+                  navigator.clipboard?.writeText(aaasCurlSnippet);
+                  setCopiedCurl(true);
+                  setTimeout(() => setCopiedCurl(false), 1800);
+                }}
+                className="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[11px] font-mono text-slate-200 flex items-center gap-1 cursor-pointer"
+              >
+                {copiedCurl ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>{copiedCurl ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setIsDeployOpen(false)}
+                className="px-4 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-semibold text-xs cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+How to Wire Live Streaming to Your /api/bot Route
+When you are ready to swap the local multi-plane simulator inside handleLaunchPrompt for your live /api/bot/route.ts endpoint (from the previous step), install @ai-sdk/react and bind useChat:
+Tsx
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
+
+const { messages, sendMessage, addToolApprovalResponse, status } = useChat({
+  transport: new DefaultChatTransport({
+    api: '/api/bot',
+    body: {
+      botId: selectedBot.id,
+      tenantId: 'tenant-enterprise-01',
+    },
+  }),
+});
+Let me know if you want the Docker (Xvfb + noVNC + xdotool + Playwright) container image for @iq-computer or the Go/Rust on-prem mTLS Sovereign Daemon generated next.
+Google AI models may make mistakes, so double-check outputs.
+Use Arrow Up and Arrow Down to select a turn, Enter to jump to it, and Escape to return to the chat.
+Start typing a prompt to see what our models can do
+
+
+Grounding with Google Search
+
+
+
+
+
+
+Response ready.

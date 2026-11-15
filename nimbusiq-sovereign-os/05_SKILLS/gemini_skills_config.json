@@ -1,0 +1,22 @@
+{
+  "skills_framework": "google-gemini/gemini-skills",
+  "install_command": "npx skills add google-gemini/gemini-skills --global",
+  "enabled_skills": [
+    {
+      "name": "gemini-api-dev",
+      "capabilities": ["model_routing", "structured_json", "context_caching", "multimodal_vision"]
+    },
+    {
+      "name": "gemini-live-api-dev",
+      "capabilities": ["websocket_audio_16k_24k", "barge_in_interruption", "live_transcription"]
+    },
+    {
+      "name": "gemini-interactions-api",
+      "capabilities": ["stateful_turns", "background_tasks", "deep_research", "omni_media"]
+    },
+    {
+      "name": "firebase-integration-rpc",
+      "capabilities": ["zero_trust_abac_rules", "firestore_sync", "google_auth_popup"]
+    }
+  ]
+}

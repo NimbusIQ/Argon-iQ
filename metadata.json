@@ -1,0 +1,6 @@
+{
+  "name": "Nimbus IQ Sovereign OS",
+  "description": "Google Partner Tech Spec Nimbus IQ OS Enterprise SaaS website, Nimbusiq.ai Command Center, and headless nimbusroofing.com",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

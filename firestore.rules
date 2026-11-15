@@ -1,0 +1,182 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Default-Deny Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -----------------------------------------------------------------------
+    // Zero-Trust ABAC Primitives
+    // -----------------------------------------------------------------------
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isEmailVerified() && (
+        request.auth.token.email == 'Dustin@nimbusiq.ai' ||
+        request.auth.token.email == 'dustin@nimbusiq.ai' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // -----------------------------------------------------------------------
+    // Validation Blueprints
+    // -----------------------------------------------------------------------
+    function isValidUserWorkspace(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'uid', 'email', 'displayName', 'role', 'permissions',
+          'claims', 'domains', 'tasks', 'memories', 'iqAssets',
+          'conversationHistory', 'createdAt', 'updatedAt'
+        ]) &&
+        data.uid is string && data.uid == userId && data.uid.size() <= 128 &&
+        data.email is string && data.email.size() <= 320 &&
+        (!('displayName' in data) || data.displayName == null || (data.displayName is string && data.displayName.size() <= 120)) &&
+        data.role in ['Owner', 'Admin', 'Developer', 'Operator', 'Viewer', 'Agent', 'Service Account'] &&
+        (!('permissions' in data) || (data.permissions is list && data.permissions.size() <= 30)) &&
+        (!('claims' in data) || (data.claims is list && data.claims.size() <= 500)) &&
+        (!('domains' in data) || (data.domains is list && data.domains.size() <= 100)) &&
+        (!('tasks' in data) || (data.tasks is list && data.tasks.size() <= 500)) &&
+        (!('memories' in data) || (data.memories is list && data.memories.size() <= 500)) &&
+        (!('iqAssets' in data) || (data.iqAssets is list && data.iqAssets.size() <= 200)) &&
+        (!('conversationHistory' in data) || (data.conversationHistory is list && data.conversationHistory.size() <= 200)) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64)) &&
+        data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    function isValidOwnedRecord(data, docId) {
+      return data.keys().hasAll(['id', 'ownerId']) &&
+        data.id is string && data.id == docId && data.id.size() <= 128 &&
+        data.ownerId is string && data.ownerId.size() <= 128 &&
+        (!('name' in data) || (data.name is string && data.name.size() <= 200)) &&
+        (!('status' in data) || (data.status is string && data.status.size() <= 64)) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64)) &&
+        (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64));
+    }
+
+    // -----------------------------------------------------------------------
+    // Collection Rules (All 8 open `if true` rules hardened + file_catalog)
+    // -----------------------------------------------------------------------
+
+    // 1. User Workspaces (PII + Conversation + Memories strictly owner-isolated)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isValidId(userId) && isEmailVerified() && isOwner(userId) &&
+        isValidUserWorkspace(incoming(), userId) &&
+        (isAdmin() || incoming().role in ['Operator', 'Viewer']);
+      allow update: if isValidId(userId) && isEmailVerified() &&
+        isValidUserWorkspace(incoming(), userId) &&
+        incoming().uid == existing().uid &&
+        (
+          isAdmin() ||
+          (
+            isOwner(userId) &&
+            !incoming().diff(existing()).affectedKeys().hasAny(['role', 'permissions', 'uid'])
+          )
+        );
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // Admin Allowlist Collection (Server/Admin Managed Only)
+    match /admins/{adminUid} {
+      allow get: if isValidId(adminUid) && (isOwner(adminUid) || isAdmin());
+      allow list, create, update, delete: if false;
+    }
+
+    // 2. Agent Catalog
+    match /agents/{agentId} {
+      allow get: if isValidId(agentId) && isEmailVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isEmailVerified() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(agentId) && isEmailVerified() && isValidOwnedRecord(incoming(), agentId) && incoming().ownerId == request.auth.uid;
+      allow update: if isValidId(agentId) && isEmailVerified() && isValidOwnedRecord(incoming(), agentId) && incoming().ownerId == existing().ownerId && (existing().ownerId == request.auth.uid || isAdmin());
+      allow delete: if isValidId(agentId) && isEmailVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+    }
+
+    // 3. Tasks & Execution Timeline
+    match /tasks/{taskId} {
+      allow get: if isValidId(taskId) && isEmailVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isEmailVerified() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(taskId) && isEmailVerified() && isValidOwnedRecord(incoming(), taskId) && incoming().ownerId == request.auth.uid;
+      allow update: if isValidId(taskId) && isEmailVerified() && isValidOwnedRecord(incoming(), taskId) && incoming().ownerId == existing().ownerId && (existing().ownerId == request.auth.uid || isAdmin());
+      allow delete: if isValidId(taskId) && isEmailVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+    }
+
+    // 4. Tool Registry
+    match /tool_registry/{toolId} {
+      allow get: if isValidId(toolId) && isEmailVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isEmailVerified() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(toolId) && isEmailVerified() && isValidOwnedRecord(incoming(), toolId) && incoming().ownerId == request.auth.uid;
+      allow update: if isValidId(toolId) && isEmailVerified() && isValidOwnedRecord(incoming(), toolId) && incoming().ownerId == existing().ownerId && (existing().ownerId == request.auth.uid || isAdmin());
+      allow delete: if isValidId(toolId) && isEmailVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+    }
+
+    // 5. Memory Index
+    match /memory_index/{memoryId} {
+      allow get: if isValidId(memoryId) && isEmailVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isEmailVerified() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(memoryId) && isEmailVerified() && isValidOwnedRecord(incoming(), memoryId) && incoming().ownerId == request.auth.uid;
+      allow update: if isValidId(memoryId) && isEmailVerified() && isValidOwnedRecord(incoming(), memoryId) && incoming().ownerId == existing().ownerId && (existing().ownerId == request.auth.uid || isAdmin());
+      allow delete: if isValidId(memoryId) && isEmailVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+    }
+
+    // 6. Workflows & Orchestrations
+    match /workflows/{workflowId} {
+      allow get: if isValidId(workflowId) && isEmailVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isEmailVerified() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(workflowId) && isEmailVerified() && isValidOwnedRecord(incoming(), workflowId) && incoming().ownerId == request.auth.uid;
+      allow update: if isValidId(workflowId) && isEmailVerified() && isValidOwnedRecord(incoming(), workflowId) && incoming().ownerId == existing().ownerId && (existing().ownerId == request.auth.uid || isAdmin());
+      allow delete: if isValidId(workflowId) && isEmailVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+    }
+
+    // 7. Sessions
+    match /sessions/{sessionId} {
+      allow get: if isValidId(sessionId) && isEmailVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isEmailVerified() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(sessionId) && isEmailVerified() && isValidOwnedRecord(incoming(), sessionId) && incoming().ownerId == request.auth.uid;
+      allow update: if isValidId(sessionId) && isEmailVerified() && isValidOwnedRecord(incoming(), sessionId) && incoming().ownerId == existing().ownerId && (existing().ownerId == request.auth.uid || isAdmin());
+      allow delete: if isValidId(sessionId) && isEmailVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+    }
+
+    // 8. Agent Configs
+    match /agent_configs/{configId} {
+      allow get: if isValidId(configId) && isEmailVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isEmailVerified() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(configId) && isEmailVerified() && isValidOwnedRecord(incoming(), configId) && incoming().ownerId == request.auth.uid;
+      allow update: if isValidId(configId) && isEmailVerified() && isValidOwnedRecord(incoming(), configId) && incoming().ownerId == existing().ownerId && (existing().ownerId == request.auth.uid || isAdmin());
+      allow delete: if isValidId(configId) && isEmailVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+    }
+
+    // 9. File-Check Catalog Snapshots
+    match /file_catalog/{snapshotId} {
+      allow get: if isValidId(snapshotId) && isEmailVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isEmailVerified() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(snapshotId) && isEmailVerified() && isValidOwnedRecord(incoming(), snapshotId) && incoming().ownerId == request.auth.uid;
+      allow update: if isValidId(snapshotId) && isEmailVerified() && isValidOwnedRecord(incoming(), snapshotId) && incoming().ownerId == existing().ownerId && (existing().ownerId == request.auth.uid || isAdmin());
+      allow delete: if isValidId(snapshotId) && isEmailVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+    }
+  }
+}

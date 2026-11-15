@@ -1,0 +1,27 @@
+{
+  "os_name": "NimbusIQ Sovereign OS",
+  "version": "2.0.0",
+  "orchestrator": "Nimbus Prime (CEO Agent / ADK Master Runtime)",
+  "posture": "open_minded_polymath_all_domain",
+  "routing_policy": {
+    "strategy": "80_20_tiered_context_cached",
+    "fast_tier_model": "gemini-3.1-flash-lite",
+    "deep_tier_model": "gemini-3.8-flash",
+    "live_voice_model": "gemini-3.8-live",
+    "tts_model": "gemini-3.8-flash-lite-tts",
+    "estimated_cache_savings_pct": 75
+  },
+  "three_level_memory": {
+    "short_term": "Active conversational turn buffer & staged multimodal attachments",
+    "long_term": "Firebase Firestore user workspace & episodic Day-1 memory ledger",
+    "institutional": "agent_constitution.md, mcp_registry.json, SATCALC & MedGemma protocols, file_check_catalog"
+  },
+  "fleet": [
+    "nimbus_prime_orchestrator",
+    "prompt_and_agent_architect",
+    "satcalc_claimcore",
+    "medgemma_health",
+    "website_operator_builder",
+    "file_check_secops_sentinel"
+  ]
+}

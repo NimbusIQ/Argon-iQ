@@ -1,0 +1,88 @@
+{
+  "entities": {
+    "UserWorkspace": {
+      "title": "UserWorkspace",
+      "description": "Authenticated operator workspace containing RBAC profile, claims, Day-1 memories, visual IQ assets, and conversation history",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "maxLength": 320 },
+        "displayName": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "enum": ["Owner", "Admin", "Developer", "Operator", "Viewer", "Agent", "Service Account"] },
+        "permissions": { "type": "array", "description": "Bounded RBAC permissions (max 30)" },
+        "claims": { "type": "array", "description": "Operator claims list (max 500)" },
+        "memories": { "type": "array", "description": "Day-1 persistent memory records (max 500)" },
+        "iqAssets": { "type": "array", "description": "Ingested multimodal visual IQ blueprints (max 200)" },
+        "conversationHistory": { "type": "array", "description": "Persisted conversational turns (max 200)" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["uid", "email", "role", "updatedAt"]
+    },
+    "SystemRegistryDoc": {
+      "title": "SystemRegistryDoc",
+      "description": "Owner-scoped operational record for agents, tasks, tool_registry, memory_index, workflows, sessions, agent_configs, and file_catalog",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "maxLength": 200 },
+        "status": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "ownerId"]
+    },
+    "FileCatalogSnapshot": {
+      "title": "FileCatalogSnapshot",
+      "description": "Verified workspace file-check catalog inventory and integrity digest",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "generatedAt": { "type": "string", "maxLength": 64 },
+        "totalFiles": { "type": "number" },
+        "integrityScore": { "type": "number" }
+      },
+      "required": ["id", "ownerId", "generatedAt", "totalFiles", "integrityScore"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserWorkspace" },
+      "description": "Private authenticated operator workspace isolated strictly to document owner or verified bootstrapped admin"
+    },
+    "/agents/{agentId}": {
+      "schema": { "$ref": "#/entities/SystemRegistryDoc" },
+      "description": "Registered autonomous agents scoped by ownerId"
+    },
+    "/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/SystemRegistryDoc" },
+      "description": "Autonomous execution task envelopes scoped by ownerId"
+    },
+    "/tool_registry/{toolId}": {
+      "schema": { "$ref": "#/entities/SystemRegistryDoc" },
+      "description": "MCP & internal enclave tool definitions scoped by ownerId"
+    },
+    "/memory_index/{memoryId}": {
+      "schema": { "$ref": "#/entities/SystemRegistryDoc" },
+      "description": "Long-term episodic and semantic RAG memory records scoped by ownerId"
+    },
+    "/workflows/{workflowId}": {
+      "schema": { "$ref": "#/entities/SystemRegistryDoc" },
+      "description": "Multi-agent orchestration graphs scoped by ownerId"
+    },
+    "/sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/SystemRegistryDoc" },
+      "description": "Live conversational & voice runtime sessions scoped by ownerId"
+    },
+    "/agent_configs/{configId}": {
+      "schema": { "$ref": "#/entities/SystemRegistryDoc" },
+      "description": "Model routing and context caching policies scoped by ownerId"
+    },
+    "/file_catalog/{snapshotId}": {
+      "schema": { "$ref": "#/entities/FileCatalogSnapshot" },
+      "description": "Workspace file inventory and SHA-256 integrity snapshots scoped by ownerId"
+    }
+  }
+}
